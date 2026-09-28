@@ -2,9 +2,7 @@ name: Actualizar todos los bancos, oficial y binance
 
 on:
   schedule:
-    # Se ejecuta automaticamente al minuto 0 de cada hora
     - cron: '0 * * * *'
-  # Permite ejecutarlo a mano cuando desees
   workflow_dispatch:
 
 permissions:
@@ -25,67 +23,67 @@ jobs:
 
       - name: Instalar librerias necesarias
         run: |
-          pip install requests pandas beautifulsoup4
+          pip install requests pandas beautifulsoup4 urllib3
 
       - name: Ejecutar scraper de Binance
-        run: |
-          python binance/scraper.py
+        continue-on-error: true
+        run: python binance/scraper.py
 
       - name: Ejecutar scraper de BCB Oficial
-        run: |
-          python oficial/scraper.py
+        continue-on-error: true
+        run: python oficial/scraper.py
 
       - name: Ejecutar scraper de BCP
-        run: |
-          python bcp/scraper.py
+        continue-on-error: true
+        run: python bcp/scraper.py
 
       - name: Ejecutar scraper de BNB
-        run: |
-          python bnb/scraper.py
+        continue-on-error: true
+        run: python bnb/scraper.py
 
       - name: Ejecutar scraper de Banco Union
-        run: |
-          python banco_union/scraper.py
+        continue-on-error: true
+        run: python banco_union/scraper.py
 
       - name: Ejecutar scraper de Prodem
-        run: |
-          python prodem/scraper.py
+        continue-on-error: true
+        run: python prodem/scraper.py
 
       - name: Ejecutar scraper de BMSC
-        run: |
-          python bmsc/scraper.py
+        continue-on-error: true
+        run: python bmsc/scraper.py
 
       - name: Ejecutar scraper de Baneco
-        run: |
-          python baneco/scraper.py
+        continue-on-error: true
+        run: python baneco/scraper.py
 
       - name: Ejecutar scraper de Ganadero
-        run: |
-          python ganadero/scraper.py
+        continue-on-error: true
+        run: python ganadero/scraper.py
 
       - name: Ejecutar scraper de BISA
-        run: |
-          python bisa/scraper.py
+        continue-on-error: true
+        run: python bisa/scraper.py
 
       - name: Ejecutar scraper de BancoSol
-        run: |
-          python bancosol/scraper.py
+        continue-on-error: true
+        run: python bancosol/scraper.py
 
       - name: Ejecutar scraper de Fortaleza
-        run: |
-          python fortaleza/scraper.py
+        continue-on-error: true
+        run: python fortaleza/scraper.py
 
       - name: Ejecutar scraper de FIE
-        run: |
-          python fie/scraper.py
+        continue-on-error: true
+        run: python fie/scraper.py
 
       - name: Ejecutar scraper de Banco de la Comunidad
-        run: |
-          python bco/scraper.py
+        continue-on-error: true
+        run: python bco/scraper.py
 
       - name: Ejecutar scraper de Ecofuturo
-        run: |
-          python ecofuturo/scraper.py
+        continue-on-error: true
+        run: python ecofuturo/scraper.py
 
       - name: Guardar los archivos CSV en el repositorio
         run: |
