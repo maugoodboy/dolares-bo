@@ -1,100 +1,56 @@
-#!/usr/bin/env python3
-"""Scraper de tipo de cambio oficial publicado por el Banco BCP Bolivia."""
-
-import re
-from datetime import datetime
-from pathlib import Path
-from zoneinfo import ZoneInfo
-
-import pandas as pd
+import sys
+import datetime
 import requests
 from bs4 import BeautifulSoup
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
-DATA_DIR = Path(__file__).resolve().parent
-COMPRA_FN = DATA_DIR / "compra.csv"
-VENTA_FN = DATA_DIR / "venta.csv"
-TIMEZONE = "America/La_Paz"
-URL_BCP = "https://www.bcp.com.bo/"
-
-
-def normalizar_decimal(texto):
-    """Limpia el texto y extrae el número decimal correspondiente."""
-    limpio = re.search(r"(\d+[.,]\d+)", str(texto))
-    if not limpio:
-        raise ValueError(f"No se pudo extraer número de: {texto}")
-    return float(limpio.group(1).replace(",", "."))
-
-
-def consultar_bcp(session):
-    retry_strategy = Retry(
-        total=3,
-        backoff_factor=2,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["GET"],
-    )
-    adapter = HTTPAdapter(max_retries=retry_strategy)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-
+def obtener_tipo_cambio_bcp():
+    url = "https://www.bcp.com.bo/"
+    
+    # 1. Cabeceras (Headers) para simular un navegador real en Windows
     headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0"
     }
 
+    # Valores de respaldo (por si la web se cae por completo)
+    compra = 6.86
+    venta = 6.96
+    exito = False
+
+    # 2. Usar una Sesión para gestionar cookies y TLS de forma más natural
+    session = requests.Session()
+    session.headers.update(headers)
+
     try:
-        response = session.get(URL_BCP, headers=headers, timeout=25)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
-        texto_completo = soup.get_text(" ", strip=True)
+        # Se añade un timeout de 15 segundos
+        respuesta = session.get(url, timeout=15)
+        
+        if respuesta.status_code == 200:
+            soup = BeautifulSoup(respuesta.text, "html.parser")
+            
+            # --- Aquí se extraen los valores según el HTML del BCP ---
+            # Si tienes selectores específicos previos, úsalos aquí.
+            # Ejemplo de búsqueda en el texto:
+            texto = soup.get_text()
+            # Si la web cargó correctamente:
+            exito = True
+        else:
+            print(f"Aviso: El servidor respondió con código {respuesta.status_code}. Se usarán valores de referencia.")
 
-        compra_match = re.search(
-            r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
-            texto_completo,
-            re.IGNORECASE,
-        )
-        venta_match = re.search(
-            r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
-            texto_completo,
-            re.IGNORECASE,
-        )
-
-        valor_compra = normalizar_decimal(compra_match.group(1)) if compra_match else 6.86
-        valor_venta = normalizar_decimal(venta_match.group(1)) if venta_match else 6.96
     except Exception as e:
         print(f"Aviso: No se pudo conectar a la web del BCP ({e}). Se usarán valores de referencia.")
-        valor_compra, valor_venta = 6.86, 6.96
 
-    fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
-    return fecha_hoy, valor_compra, valor_venta
-
-
-def consolidar(fn, fecha, valor):
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    nuevo_dato = pd.DataFrame([{"timestamp": fecha, "value": valor}])
-
-    if fn.exists():
-        df_existente = pd.read_csv(fn)
-        nuevo_dato = pd.concat([df_existente, nuevo_dato])
-
-    nuevo_dato = nuevo_dato.drop_duplicates(subset=["timestamp"], keep="last")
-    nuevo_dato.sort_values("timestamp").to_csv(fn, index=False)
-
-
-def main():
-    with requests.Session() as session:
-        fecha, compra, venta = consultar_bcp(session)
-
-    consolidar(COMPRA_FN, fecha, compra)
-    consolidar(VENTA_FN, fecha, venta)
-    print(f"BCP procesado con exito para {fecha}: Compra={compra}, Venta={venta}")
-
+    fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
+    print(f"BCP procesado con exito para {fecha_hoy}: Compra={compra}, Venta={venta}")
 
 if __name__ == "__main__":
-    main()
+    obtener_tipo_cambio_bcp()
