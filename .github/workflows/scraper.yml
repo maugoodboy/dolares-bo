@@ -1,10 +1,10 @@
-name: Actualizar datos de divisas
+name: Actualizar Binance y Oficial BCB
 
 on:
   schedule:
-    # Se ejecuta automaticamente cada hora
+    # Se ejecuta de forma automatica cada hora
     - cron: '0 * * * *'
-  # Permite ejecutarlo a mano cuando quieras
+  # Permite que lo actives a mano cuando quieras hacer pruebas
   workflow_dispatch:
 
 permissions:
@@ -25,19 +25,19 @@ jobs:
 
       - name: Instalar librerias necesarias
         run: |
-          pip install requests pandas beautifulsoup4 lxml
+          pip install requests pandas beautifulsoup4
 
       - name: Ejecutar scraper de Binance
         run: |
           python binance/scraper.py
 
-      - name: Ejecutar scraper de BCB
+      - name: Ejecutar scraper de BCB Oficial
         run: |
-          python bcb/scraper.py
+          python oficial/scraper.py
 
       - name: Guardar los archivos CSV en el repositorio
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add binance/*.csv bcb/*.csv
-          git diff --quiet && git diff --staged --quiet || (git commit -m "[ci] update datos" && git push)
+          git add binance/*.csv oficial/*.csv
+          git diff --quiet && git diff --staged --quiet || (git commit -m "[ci] update binance y oficial" && git push)
