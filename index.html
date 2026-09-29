@@ -1,125 +1,233 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dólares Bolivia - Cotizaciones</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cotizaciones del Dólar en Bolivia</title>
+  
+  <!-- Estilos visuales minimalistas idénticos al proyecto de referencia -->
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #0f172a;
-      color: #f8fafc;
+    :root {
+      --bg: #ffffff;
+      --card-bg: #fdfdfd;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --border-color: #e5e7eb;
+      --highlight: #2563eb;
+      --green: #15803d;
+    }
+
+    * {
+      box-sizing: border-box;
       margin: 0;
-      padding: 20px;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 30px 15px;
       display: flex;
-      flex-direction: column;
-      align-items: center;
+      justify-content: center;
     }
-    h1 {
-      margin-bottom: 8px;
+
+    .container {
+      width: 100%;
+      max-width: 680px;
     }
-    .subtitulo {
-      color: #94a3b8;
+
+    header {
       margin-bottom: 24px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* Tabla de cotizaciones */
+    .table-container {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    thead tr {
+      background-color: #f9fafb;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      padding: 12px 16px;
+      font-weight: 600;
+    }
+
+    th.num, td.num {
+      text-align: right;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border-color);
+      transition: background-color 0.15s ease;
+    }
+
+    tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background-color: #f8fafc;
+    }
+
+    td {
+      padding: 12px 16px;
       font-size: 0.95rem;
     }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
-      width: 100%;
-      max-width: 1000px;
+
+    .bank-name {
+      font-weight: 600;
+      color: var(--text-main);
     }
-    .card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 16px 20px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+
+    .rate {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
     }
-    .card h2 {
-      margin: 0 0 12px 0;
-      font-size: 1.2rem;
-      text-transform: capitalize;
-      color: #38bdf8;
+
+    .date-col {
+      font-size: 0.8rem;
+      color: var(--text-muted);
     }
-    .fila {
-      display: flex;
-      justify-content: space-between;
-      margin: 8px 0;
-      font-size: 1rem;
-    }
-    .valor {
-      font-weight: bold;
-      color: #4ade80;
-    }
-    .fecha {
-      font-size: 0.75rem;
-      color: #64748b;
-      margin-top: 12px;
-      border-top: 1px solid #334155;
-      padding-top: 8px;
+
+    .footer {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
     }
   </style>
 </head>
 <body>
 
-  <h1>Cotizaciones del Dólar en Bolivia</h1>
-  <div class="subtitulo">Valores actualizados automáticamente</div>
+  <div class="container">
+    <header>
+      <h1>Dólar en Bolivia</h1>
+      <p class="subtitle">Cotizaciones en tiempo real extraídas de entidades financieras</p>
+    </header>
 
-  <div class="grid" id="contenedor-tarjetas">
-    <!-- Aquí aparecerán los bancos automáticamente -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Entidad</th>
+            <th class="num">Compra</th>
+            <th class="num">Venta</th>
+            <th class="num">Actualizado</th>
+          </tr>
+        </thead>
+        <tbody id="cotizaciones-cuerpo">
+          <!-- Las filas se rellenan solas con el script -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      Datos recopilados automáticamente vía GitHub Actions.
+    </div>
   </div>
 
   <script>
-    // Lista de las carpetas que tienes en tu repositorio
+    // Lista de entidades y nombres visibles
     const entidades = [
-      { id: 'oficial', nombre: 'Oficial' },
-      { id: 'binance', nombre: 'Binance P2P' },
-      { id: 'bcp', nombre: 'Banco BCP' },
+      { id: 'oficial', nombre: 'Oficial (BCB)' },
       { id: 'banco_union', nombre: 'Banco Unión' },
-      { id: 'bancosol', nombre: 'BancoSol' },
-      { id: 'bisa', nombre: 'Banco BISA' },
+      { id: 'bcp', nombre: 'BCP' },
+      { id: 'bnb', nombre: 'BNB' },
       { id: 'bmsc', nombre: 'Mercantil Santa Cruz' },
-      { id: 'bnb', nombre: 'Banco BNB' },
+      { id: 'bisa', nombre: 'Banco BISA' },
       { id: 'ganadero', nombre: 'Banco Ganadero' },
+      { id: 'bancosol', nombre: 'BancoSol' },
       { id: 'baneco', nombre: 'Banco Económico' },
-      { id: 'ecofuturo', nombre: 'Ecofuturo' },
       { id: 'fie', nombre: 'Banco FIE' },
-      { id: 'fortaleza', nombre: 'Banco Fortaleza' }
+      { id: 'fortaleza', nombre: 'Banco Fortaleza' },
+      { id: 'ecofuturo', nombre: 'Ecofuturo' },
+      { id: 'bco', nombre: 'Banco BCO' },
+      { id: 'binance', nombre: 'Binance P2P' }
     ];
 
-    const contenedor = document.getElementById('contenedor-tarjetas');
+    // Lee el archivo CSV y extrae el último número registrado
+    async function leerUltimaFila(rutaCsv) {
+      try {
+        const respuesta = await fetch(rutaCsv + '?t=' + Date.now());
+        if (!respuesta.ok) return { valor: '-', fecha: '' };
+        
+        const texto = await respuesta.text();
+        const filas = texto.trim().split('\n').filter(linea => linea.trim() !== '');
+        if (filas.length <= 1) return { valor: '-', fecha: '' };
 
-    entidades.forEach(entidad => {
-      // Intentamos leer el archivo json dentro de cada carpeta
-      fetch(`./${entidad.id}/data.json?t=${Date.now()}`)
-        .then(res => {
-          if (!res.ok) throw new Error('No encontrado');
-          return res.json();
-        })
-        .then(data => {
-          const card = document.createElement('div');
-          card.className = 'card';
+        const ultimaLinea = filas[filas.length - 1];
+        const columnas = ultimaLinea.split(',');
+
+        return {
+          valor: columnas[1] ? columnas[1].trim() : columnas[0].trim(),
+          fecha: columnas[0] ? columnas[0].trim() : ''
+        };
+      } catch (e) {
+        return { valor: '-', fecha: '' };
+      }
+    }
+
+    async function cargarTabla() {
+      const cuerpo = document.getElementById('cotizaciones-cuerpo');
+
+      for (const banco of entidades) {
+        const fila = document.createElement('tr');
+        fila.id = `fila-${banco.id}`;
+        fila.innerHTML = `
+          <td class="bank-name">${banco.nombre}</td>
+          <td class="num rate" id="c-${banco.id}">...</td>
+          <td class="num rate" id="v-${banco.id}">...</td>
+          <td class="num date-col" id="f-${banco.id}">...</td>
+        `;
+        cuerpo.appendChild(fila);
+
+        // Consultamos compra y venta al mismo tiempo
+        Promise.all([
+          leerUltimaFila(`./${banco.id}/compra.csv`),
+          leerUltimaFila(`./${banco.id}/venta.csv`)
+        ]).then(([compra, venta]) => {
+          document.getElementById(`c-${banco.id}`).textContent = compra.valor !== '-' ? compra.valor : '—';
+          document.getElementById(`v-${banco.id}`).textContent = venta.valor !== '-' ? venta.valor : '—';
           
-          // Extraemos los valores (adaptables si tienen nombres en inglés o español)
-          const compra = data.compra || data.buy || data.rate || 'N/A';
-          const venta = data.venta || data.sell || 'N/A';
-          const fecha = data.fecha || data.date || data.updated_at || data.timestamp || 'Reciente';
-
-          card.innerHTML = `
-            <h2>${entidad.nombre}</h2>
-            <div class="fila"><span>Compra:</span> <span class="valor">${compra}</span></div>
-            <div class="fila"><span>Venta:</span> <span class="valor">${venta}</span></div>
-            <div class="fecha">Actualizado: ${fecha}</div>
-          `;
-          contenedor.appendChild(card);
-        })
-        .catch(err => {
-          // Si una carpeta aún no tiene el json o tiene otro nombre, simplemente no se rompe la web
-          console.warn(`No se pudo cargar datos de ${entidad.id}`);
+          const fechaStr = venta.fecha || compra.fecha;
+          document.getElementById(`f-${banco.id}`).textContent = fechaStr || '—';
         });
-    });
+      }
+    }
+
+    // Ejecutar al cargar la página
+    cargarTabla();
   </script>
 </body>
 </html>
