@@ -40,20 +40,23 @@ def consultar_fortaleza(session):
     soup = BeautifulSoup(response.text, "html.parser")
     texto_completo = soup.get_text(" ", strip=True)
 
-    # Búsqueda de cotización de compra y venta para USD
+    # Coincide con: COMPRA 12.02 o VENTA 12.12 (con o sin dos puntos/espacios)
     compra_match = re.search(
-        r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+        r"compra\s*[:\-]?\s*(\d+[.,]\d+)",
         texto_completo,
         re.IGNORECASE,
     )
     venta_match = re.search(
-        r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+        r"venta\s*[:\-]?\s*(\d+[.,]\d+)",
         texto_completo,
         re.IGNORECASE,
     )
 
-    valor_compra = normalizar_decimal(compra_match.group(1)) if compra_match else 6.86
-    valor_venta = normalizar_decimal(venta_match.group(1)) if venta_match else 6.96
+    if not compra_match or not venta_match:
+        raise ValueError("No se encontraron los valores de compra/venta en la página.")
+
+    valor_compra = normalizar_decimal(compra_match.group(1))
+    valor_venta = normalizar_decimal(venta_match.group(1))
 
     fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
     return fecha_hoy, valor_compra, valor_venta
