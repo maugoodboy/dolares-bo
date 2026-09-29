@@ -14,7 +14,7 @@ DATA_DIR = Path(__file__).resolve().parent
 COMPRA_FN = DATA_DIR / "compra.csv"
 VENTA_FN = DATA_DIR / "venta.csv"
 TIMEZONE = "America/La_Paz"
-URL_BMSC = "https://www.bmsc.com.bo/"
+URL_BMSC = "https://www.bmsc.com.bo/AdditionalInfo/tariffs"
 
 
 def normalizar_decimal(texto):
