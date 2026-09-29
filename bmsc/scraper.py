@@ -37,32 +37,39 @@ def consultar_bmsc(session):
     response = session.get(URL_BMSC, headers=headers, timeout=20)
     response.raise_for_status()
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    texto_completo = soup.get_text(" ", strip=True)
+    # 1. Forzar decodificación en UTF-8 para evitar errores con tildes (Dólar vs DÃ³lar)
+    contenido_html = response.content.decode("utf-8", errors="replace")
+    soup = BeautifulSoup(contenido_html, "html.parser")
 
-    # Expresión regular que busca exactamente la sección de "Dólar:" / "Dolar:"
-    # y captura los números siguientes a "Compra:" y "Venta:"
-    patron_dolar = re.search(
-        r"D[oó]lar\s*:\s*Compra\s*:\s*(\d+[.,]\d+)\s*.*?\s*Venta\s*:\s*(\d+[.,]\d+)",
-        texto_completo,
-        re.IGNORECASE,
-    )
+    valor_compra = None
+    valor_venta = None
 
-    if patron_dolar:
-        valor_compra = normalizar_decimal(patron_dolar.group(1))
-        valor_venta = normalizar_decimal(patron_dolar.group(2))
-    else:
-        # Búsqueda más flexible en caso de ligeras variaciones en espacios o símbolos
-        patron_flexible = re.search(
-            r"D[oó]lar[\s\S]{0,40}?Compra[\s\S]{0,15}?(\d+[.,]\d+)[\s\S]{0,40}?Venta[\s\S]{0,15}?(\d+[.,]\d+)",
+    # 2. Estrategia principal: Buscar el bloque o tarjeta HTML que contenga "dólar" / "dolar"
+    for etiqueta in soup.find_all(["div", "li", "span", "p", "tr"]):
+        texto_etiqueta = etiqueta.get_text(" ", strip=True).lower()
+        if ("dólar" in texto_etiqueta or "dolar" in texto_etiqueta) and "cmv" not in texto_etiqueta:
+            m_compra = re.search(r"compra\s*:?\s*(\d+[.,]\d+)", texto_etiqueta)
+            m_venta = re.search(r"venta\s*:?\s*(\d+[.,]\d+)", texto_etiqueta)
+            if m_compra and m_venta:
+                valor_compra = normalizar_decimal(m_compra.group(1))
+                valor_venta = normalizar_decimal(m_venta.group(1))
+                break
+
+    # 3. Estrategia de respaldo: Búsqueda flexible en todo el texto plano
+    if valor_compra is None or valor_venta is None:
+        texto_completo = soup.get_text(" ", strip=True)
+        patron = re.search(
+            r"d[oó\w]{0,3}lar[\s\S]{1,150}?compra\s*:?\s*(\d+[.,]\d+)[\s\S]{1,150}?venta\s*:?\s*(\d+[.,]\d+)",
             texto_completo,
             re.IGNORECASE,
         )
-        if patron_flexible:
-            valor_compra = normalizar_decimal(patron_flexible.group(1))
-            valor_venta = normalizar_decimal(patron_flexible.group(2))
-        else:
-            raise ValueError("No se pudo localizar el bloque del 'Dólar' en la página del BMSC.")
+        if patron:
+            valor_compra = normalizar_decimal(patron.group(1))
+            valor_venta = normalizar_decimal(patron.group(2))
+
+    # Si todo falla, comprobación de seguridad
+    if valor_compra is None or valor_venta is None:
+        raise ValueError("No se pudo localizar el bloque del 'Dólar' en el sitio de BMSC.")
 
     fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
     return fecha_hoy, valor_compra, valor_venta
