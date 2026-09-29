@@ -16,7 +16,7 @@ VENTA_FN = DATA_DIR / "venta.csv"
 TIMEZONE = "America/La_Paz"
 
 URL_HOME = "https://www.bmsc.com.bo/"
-URL_TARIFFS = "https://www.bmsc.com.bo/AdditionalInfo/tariffs"
+URL_TARIFFS = "https://www.bmsc.com.bo/"
 
 
 def normalizar_decimal(texto):
