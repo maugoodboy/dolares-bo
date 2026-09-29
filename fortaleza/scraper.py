@@ -26,31 +26,53 @@ def normalizar_decimal(texto):
 
 
 def consultar_fortaleza(session):
+    """Descarga la página de Banco Fortaleza y extrae compra y venta."""
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/124.0.0.0 Safari/537.36"
         ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "es-ES,es;q=0.9",
+        "Referer": "https://www.google.com/",
     }
-    response = session.get(URL_FORTALEZA, headers=headers, timeout=20)
+    
+    # Realizar petición web
+    response = session.get(URL_FORTALEZA, headers=headers, timeout=25)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
     texto_completo = soup.get_text(" ", strip=True)
 
-    # Coincide con: COMPRA 12.02 o VENTA 12.12 (con o sin dos puntos/espacios)
+    # 1. Intentar patrón flexible para 'Compra'
     compra_match = re.search(
-        r"compra\s*[:\-]?\s*(\d+[.,]\d+)",
+        r"compra\s*[:\-]?\s*(?:bs\.?|bob|\$)?\s*(\d+[.,]\d+)",
         texto_completo,
         re.IGNORECASE,
     )
+
+    # 2. Intentar patrón flexible para 'Venta'
     venta_match = re.search(
-        r"venta\s*[:\-]?\s*(\d+[.,]\d+)",
+        r"venta\s*[:\-]?\s*(?:bs\.?|bob|\$)?\s*(\d+[.,]\d+)",
         texto_completo,
         re.IGNORECASE,
     )
+
+    # 3. Plan de respaldo si están en orden inverso o separados
+    if not compra_match:
+        compra_match = re.search(
+            r"(\d+[.,]\d+)\s*(?:bs\.?|bob)?\s*compra",
+            texto_completo,
+            re.IGNORECASE,
+        )
+
+    if not venta_match:
+        venta_match = re.search(
+            r"(\d+[.,]\d+)\s*(?:bs\.?|bob)?\s*venta",
+            texto_completo,
+            re.IGNORECASE,
+        )
 
     if not compra_match or not venta_match:
         raise ValueError("No se encontraron los valores de compra/venta en la página.")
@@ -63,6 +85,7 @@ def consultar_fortaleza(session):
 
 
 def consolidar(fn, fecha, valor):
+    """Guarda o actualiza el registro en el archivo CSV."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     nuevo_dato = pd.DataFrame([{"timestamp": fecha, "value": valor}])
 
