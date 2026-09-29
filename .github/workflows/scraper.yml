@@ -33,9 +33,9 @@ jobs:
         continue-on-error: true
         run: python oficial/scraper.py
 
-      - name: Ejecutar scraper de BCP
-        continue-on-error: true
-        run: python bcp/scraper.py
+      # - name: Ejecutar scraper de BCP
+      #   continue-on-error: true
+      #   run: python bcp/scraper.py
 
       - name: Ejecutar scraper de BNB
         continue-on-error: true
@@ -45,9 +45,9 @@ jobs:
         continue-on-error: true
         run: python banco_union/scraper.py
 
-      - name: Ejecutar scraper de Prodem
-        continue-on-error: true
-        run: python prodem/scraper.py
+      # - name: Ejecutar scraper de Prodem
+      #   continue-on-error: true
+      #   run: python prodem/scraper.py
 
       - name: Ejecutar scraper de BMSC
         continue-on-error: true
@@ -69,13 +69,13 @@ jobs:
         continue-on-error: true
         run: python bancosol/scraper.py
 
-      - name: Ejecutar scraper de Fortaleza
-        continue-on-error: true
-        run: python fortaleza/scraper.py
+      # - name: Ejecutar scraper de Fortaleza
+      #   continue-on-error: true
+      #   run: python fortaleza/scraper.py
 
-      - name: Ejecutar scraper de FIE
-        continue-on-error: true
-        run: python fie/scraper.py
+      # - name: Ejecutar scraper de FIE
+      #   continue-on-error: true
+      #   run: python fie/scraper.py
 
       - name: Ejecutar scraper de Banco de la Comunidad
         continue-on-error: true
