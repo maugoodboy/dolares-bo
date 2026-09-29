@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scraper de tipo de cambio publicado por Banco Mercantil Santa Cruz (BMSC)."""
+"""Scraper de tipo de cambio del Dólar publicado por Banco Mercantil Santa Cruz (BMSC)."""
 
 import re
 from datetime import datetime
@@ -40,20 +40,29 @@ def consultar_bmsc(session):
     soup = BeautifulSoup(response.text, "html.parser")
     texto_completo = soup.get_text(" ", strip=True)
 
-    # Búsqueda de cotización de compra y venta para USD
-    compra_match = re.search(
-        r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
-        texto_completo,
-        re.IGNORECASE,
-    )
-    venta_match = re.search(
-        r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+    # Expresión regular que busca exactamente la sección de "Dólar:" / "Dolar:"
+    # y captura los números siguientes a "Compra:" y "Venta:"
+    patron_dolar = re.search(
+        r"D[oó]lar\s*:\s*Compra\s*:\s*(\d+[.,]\d+)\s*.*?\s*Venta\s*:\s*(\d+[.,]\d+)",
         texto_completo,
         re.IGNORECASE,
     )
 
-    valor_compra = normalizar_decimal(compra_match.group(1)) if compra_match else 6.86
-    valor_venta = normalizar_decimal(venta_match.group(1)) if venta_match else 6.96
+    if patron_dolar:
+        valor_compra = normalizar_decimal(patron_dolar.group(1))
+        valor_venta = normalizar_decimal(patron_dolar.group(2))
+    else:
+        # Búsqueda más flexible en caso de ligeras variaciones en espacios o símbolos
+        patron_flexible = re.search(
+            r"D[oó]lar[\s\S]{0,40}?Compra[\s\S]{0,15}?(\d+[.,]\d+)[\s\S]{0,40}?Venta[\s\S]{0,15}?(\d+[.,]\d+)",
+            texto_completo,
+            re.IGNORECASE,
+        )
+        if patron_flexible:
+            valor_compra = normalizar_decimal(patron_flexible.group(1))
+            valor_venta = normalizar_decimal(patron_flexible.group(2))
+        else:
+            raise ValueError("No se pudo localizar el bloque del 'Dólar' en la página del BMSC.")
 
     fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
     return fecha_hoy, valor_compra, valor_venta
@@ -77,7 +86,7 @@ def main():
 
     consolidar(COMPRA_FN, fecha, compra)
     consolidar(VENTA_FN, fecha, venta)
-    print(f"BMSC actualizado con exito para {fecha}: Compra={compra}, Venta={venta}")
+    print(f"BMSC actualizado con éxito para {fecha}: Compra={compra}, Venta={venta}")
 
 
 if __name__ == "__main__":
