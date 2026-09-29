@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dólares Bolivia - Cotizaciones</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin-bottom: 8px;
+    }
+    .subtitulo {
+      color: #94a3b8;
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      width: 100%;
+      max-width: 1000px;
+    }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    .card h2 {
+      margin: 0 0 12px 0;
+      font-size: 1.2rem;
+      text-transform: capitalize;
+      color: #38bdf8;
+    }
+    .fila {
+      display: flex;
+      justify-content: space-between;
+      margin: 8px 0;
+      font-size: 1rem;
+    }
+    .valor {
+      font-weight: bold;
+      color: #4ade80;
+    }
+    .fecha {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-top: 12px;
+      border-top: 1px solid #334155;
+      padding-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Cotizaciones del Dólar en Bolivia</h1>
+  <div class="subtitulo">Valores actualizados automáticamente</div>
+
+  <div class="grid" id="contenedor-tarjetas">
+    <!-- Aquí aparecerán los bancos automáticamente -->
+  </div>
+
+  <script>
+    // Lista de las carpetas que tienes en tu repositorio
+    const entidades = [
+      { id: 'oficial', nombre: 'Oficial' },
+      { id: 'binance', nombre: 'Binance P2P' },
+      { id: 'bcp', nombre: 'Banco BCP' },
+      { id: 'banco_union', nombre: 'Banco Unión' },
+      { id: 'bancosol', nombre: 'BancoSol' },
+      { id: 'bisa', nombre: 'Banco BISA' },
+      { id: 'bmsc', nombre: 'Mercantil Santa Cruz' },
+      { id: 'bnb', nombre: 'Banco BNB' },
+      { id: 'ganadero', nombre: 'Banco Ganadero' },
+      { id: 'baneco', nombre: 'Banco Económico' },
+      { id: 'ecofuturo', nombre: 'Ecofuturo' },
+      { id: 'fie', nombre: 'Banco FIE' },
+      { id: 'fortaleza', nombre: 'Banco Fortaleza' }
+    ];
+
+    const contenedor = document.getElementById('contenedor-tarjetas');
+
+    entidades.forEach(entidad => {
+      // Intentamos leer el archivo json dentro de cada carpeta
+      fetch(`./${entidad.id}/data.json?t=${Date.now()}`)
+        .then(res => {
+          if (!res.ok) throw new Error('No encontrado');
+          return res.json();
+        })
+        .then(data => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          
+          // Extraemos los valores (adaptables si tienen nombres en inglés o español)
+          const compra = data.compra || data.buy || data.rate || 'N/A';
+          const venta = data.venta || data.sell || 'N/A';
+          const fecha = data.fecha || data.date || data.updated_at || data.timestamp || 'Reciente';
+
+          card.innerHTML = `
+            <h2>${entidad.nombre}</h2>
+            <div class="fila"><span>Compra:</span> <span class="valor">${compra}</span></div>
+            <div class="fila"><span>Venta:</span> <span class="valor">${venta}</span></div>
+            <div class="fecha">Actualizado: ${fecha}</div>
+          `;
+          contenedor.appendChild(card);
+        })
+        .catch(err => {
+          // Si una carpeta aún no tiene el json o tiene otro nombre, simplemente no se rompe la web
+          console.warn(`No se pudo cargar datos de ${entidad.id}`);
+        });
+    });
+  </script>
+</body>
+</html>
