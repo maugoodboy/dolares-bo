@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """Scraper de tipo de cambio oficial publicado por Banco Unión."""
 
@@ -18,7 +19,7 @@ URL_BANCO_UNION = "https://bancounion.com.bo/"
 
 
 def normalizar_decimal(texto):
-    """Extrae el valor numérico en formato decimal."""
+    """Convierte texto como '11,02' o '12.12' en número flotante 11.02."""
     limpio = re.search(r"(\d+[.,]\d+)", str(texto))
     if not limpio:
         raise ValueError(f"No se pudo extraer número de: {texto}")
@@ -40,20 +41,34 @@ def consultar_banco_union(session):
     soup = BeautifulSoup(response.text, "html.parser")
     texto_completo = soup.get_text(" ", strip=True)
 
-    # Búsqueda de cotización de compra y venta para USD
+    # Patrón exacto para Banco Unión:
+    # "Compra BOB: 11,02 / Venta 12,12" o variaciones similares
     compra_match = re.search(
-        r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+        r"compra\s*(?:bob)?\s*[:\-]?\s*(\d+[.,]\d+)",
         texto_completo,
         re.IGNORECASE,
     )
     venta_match = re.search(
-        r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+        r"venta\s*(?:bob)?\s*[:\-]?\s*(\d+[.,]\d+)",
         texto_completo,
         re.IGNORECASE,
     )
 
-    valor_compra = normalizar_decimal(compra_match.group(1)) if compra_match else 6.86
-    valor_venta = normalizar_decimal(venta_match.group(1)) if venta_match else 6.96
+    if not compra_match or not venta_match:
+        # Intento de rescate si el formato viene junto en una sola frase
+        rescate = re.search(
+            r"compra\s*bob:\s*(\d+[.,]\d+)\s*/\s*venta\s*(\d+[.,]\d+)",
+            texto_completo,
+            re.IGNORECASE,
+        )
+        if rescate:
+            valor_compra = normalizar_decimal(rescate.group(1))
+            valor_venta = normalizar_decimal(rescate.group(2))
+        else:
+            raise ValueError("No se encontraron los valores de compra y venta en el texto de Banco Unión.")
+    else:
+        valor_compra = normalizar_decimal(compra_match.group(1))
+        valor_venta = normalizar_decimal(venta_match.group(1))
 
     fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
     return fecha_hoy, valor_compra, valor_venta
@@ -77,7 +92,7 @@ def main():
 
     consolidar(COMPRA_FN, fecha, compra)
     consolidar(VENTA_FN, fecha, venta)
-    print(f"Banco Union actualizado con exito para {fecha}: Compra={compra}, Venta={venta}")
+    print(f"Banco Union actualizado con éxito para {fecha}: Compra={compra}, Venta={venta}")
 
 
 if __name__ == "__main__":
