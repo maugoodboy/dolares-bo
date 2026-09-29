@@ -10,6 +10,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+# Configuración de rutas y variables básicas
 DATA_DIR = Path(__file__).resolve().parent
 COMPRA_FN = DATA_DIR / "compra.csv"
 VENTA_FN = DATA_DIR / "venta.csv"
@@ -26,6 +27,7 @@ def normalizar_decimal(texto):
 
 
 def consultar_fie(session):
+    """Descarga la página web y extrae los tipos de cambio de compra y venta."""
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -40,26 +42,34 @@ def consultar_fie(session):
     soup = BeautifulSoup(response.text, "html.parser")
     texto_completo = soup.get_text(" ", strip=True)
 
-    # Búsqueda de cotización de compra y venta para USD
+    # Búsqueda que contempla 'Dólar Compra: 11,52' o 'Compra: 11,52'
     compra_match = re.search(
-        r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+        r"(?:d[oó]lar\s+)?compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
         texto_completo,
         re.IGNORECASE,
     )
+    
+    # Búsqueda que contempla 'Dólar Venta: 12,02' o 'Venta: 12,02'
     venta_match = re.search(
-        r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+        r"(?:d[oó]lar\s+)?venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
         texto_completo,
         re.IGNORECASE,
     )
 
-    valor_compra = normalizar_decimal(compra_match.group(1)) if compra_match else 6.86
-    valor_venta = normalizar_decimal(venta_match.group(1)) if venta_match else 6.96
+    if not compra_match or not venta_match:
+        raise ValueError(
+            "No se pudieron encontrar las etiquetas de compra o venta en el texto de la página."
+        )
+
+    valor_compra = normalizar_decimal(compra_match.group(1))
+    valor_venta = normalizar_decimal(venta_match.group(1))
 
     fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
     return fecha_hoy, valor_compra, valor_venta
 
 
 def consolidar(fn, fecha, valor):
+    """Guarda o actualiza el registro en el archivo CSV correspondiente."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     nuevo_dato = pd.DataFrame([{"timestamp": fecha, "value": valor}])
 
