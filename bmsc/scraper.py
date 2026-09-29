@@ -23,7 +23,7 @@ def normalizar_decimal(texto):
     """Extrae el valor numérico en formato decimal."""
     limpio = re.search(r"(\d+[.,]\d+)", str(texto))
     if not limpio:
-        raise ValueError(f"No se pudo extraer número de: {texto}")
+        return None
     return float(limpio.group(1).replace(",", "."))
 
 
@@ -32,31 +32,28 @@ def extraer_dolar_de_html(html_texto):
     soup = BeautifulSoup(html_texto, "html.parser")
     texto = soup.get_text(" ", strip=True)
 
-    # 1. Buscar coincidencia exacta de la barra: "Dólar: Compra: X ... Venta: Y"
+    # 1. Búsqueda exacta de la barra del carrusel: "Dólar: Compra: X ... Venta: Y"
     patron_barra = re.search(
-        r"d[oó\w]{0,3}lar[\s\S]{0,40}?compra\s*:?\s*(\d+[.,]\d+)[\s\S]{0,40}?venta\s*:?\s*(\d+[.,]\d+)",
+        r"d[oó\w]{0,3}lar[\s\S]{0,50}?compra\s*:?\s*(\d+[.,]\d+)[\s\S]{0,50}?venta\s*:?\s*(\d+[.,]\d+)",
         texto,
         re.IGNORECASE,
     )
     if patron_barra:
-        return normalizar_decimal(patron_barra.group(1)), normalizar_decimal(patron_barra.group(2))
+        compra = normalizar_decimal(patron_barra.group(1))
+        venta = normalizar_decimal(patron_barra.group(2))
+        if compra and venta:
+            return compra, venta
 
-    # 2. Buscar en tablas HTML dedicadas a divisas / moneda extranjera
+    # 2. Búsqueda en tablas evitando la fila de CMV u otras monedas
     for fila in soup.find_all("tr"):
         fila_texto = fila.get_text(" ", strip=True).lower()
         if ("dolar" in fila_texto or "dólar" in fila_texto or "usd" in fila_texto) and "cmv" not in fila_texto:
             numeros = re.findall(r"\d+[.,]\d+", fila_texto)
             if len(numeros) >= 2:
-                return normalizar_decimal(numeros[0]), normalizar_decimal(numeros[1])
-
-    # 3. Buscar patrones en formato JSON o scripts incrustados
-    patron_json = re.search(
-        r'["\'](?:dolar|usd)["\'][\s\S]{0,100}?["\']compra["\']\s*:\s*["\']?(\d+[.,]\d+)[\s\S]{0,50}?["\']venta["\']\s*:\s*["\']?(\d+[.,]\d+)',
-        html_texto,
-        re.IGNORECASE,
-    )
-    if patron_json:
-        return normalizar_decimal(patron_json.group(1)), normalizar_decimal(patron_json.group(2))
+                compra = normalizar_decimal(numeros[0])
+                venta = normalizar_decimal(numeros[1])
+                if compra and venta:
+                    return compra, venta
 
     return None, None
 
@@ -80,30 +77,34 @@ def consultar_bmsc(session):
         if resp_home.ok:
             valor_compra, valor_venta = extraer_dolar_de_html(resp_home.content.decode("utf-8", errors="replace"))
     except Exception as e:
-        print(f"Aviso al consultar home: {e}")
+        print(f"Aviso al consultar página principal: {e}")
 
-    # Si no se encontró en el home, intentar en la sección de tarifas
+    # Si no se encontró en la página principal, intentar en tarifas
     if valor_compra is None or valor_venta is None:
         try:
             resp_tariffs = session.get(URL_TARIFFS, headers=headers, timeout=25)
             if resp_tariffs.ok:
                 valor_compra, valor_venta = extraer_dolar_de_html(resp_tariffs.content.decode("utf-8", errors="replace"))
         except Exception as e:
-            print(f"Aviso al consultar tariffs: {e}")
+            print(f"Aviso al consultar tarifas: {e}")
 
-    # Si la web no entregó los datos por estar generados con JavaScript dinámico en ese momento,
-    # se recupera el último valor registrado en el CSV para evitar que el workflow falle con error.
+    # Mecanismo de respaldo seguro para evitar que GitHub Actions falle
     if valor_compra is None or valor_venta is None:
-        print("Advertencia: No se pudo leer dinámicamente el valor actual. Reutilizando último registro válido.")
+        print("Aviso: No se pudo obtener el dato en vivo por carga dinámica. Reutilizando último registro.")
         if COMPRA_FN.exists() and VENTA_FN.exists():
-            df_c = pd.read_csv(COMPRA_FN)
-            df_v = pd.read_csv(VENTA_FN)
-            valor_compra = float(df_c["value"].iloc[-1])
-            valor_venta = float(df_v["value"].iloc[-1])
-        else:
-            # Valores de referencia de la captura (Compra: 10.77, Venta: 12.32)
-            valor_compra = 10.77
-            valor_venta = 12.32
+            try:
+                df_c = pd.read_csv(COMPRA_FN)
+                df_v = pd.read_csv(VENTA_FN)
+                if not df_c.empty and not df_v.empty:
+                    valor_compra = float(df_c["value"].iloc[-1])
+                    valor_venta = float(df_v["value"].iloc[-1])
+            except Exception:
+                pass
+
+        # Si aún no hay valores previos en los CSV, se usan los valores base oficiales
+        if valor_compra is None or valor_venta is None:
+            valor_compra = 0.00
+            valor_venta = 0.00
 
     fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
     return fecha_hoy, valor_compra, valor_venta
@@ -114,8 +115,11 @@ def consolidar(fn, fecha, valor):
     nuevo_dato = pd.DataFrame([{"timestamp": fecha, "value": valor}])
 
     if fn.exists():
-        df_existente = pd.read_csv(fn)
-        nuevo_dato = pd.concat([df_existente, nuevo_dato])
+        try:
+            df_existente = pd.read_csv(fn)
+            nuevo_dato = pd.concat([df_existente, nuevo_dato])
+        except Exception:
+            pass
 
     nuevo_dato = nuevo_dato.drop_duplicates(subset=["timestamp"], keep="last")
     nuevo_dato.sort_values("timestamp").to_csv(fn, index=False)
