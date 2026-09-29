@@ -15,7 +15,7 @@ DATA_DIR = Path(__file__).resolve().parent
 COMPRA_FN = DATA_DIR / "compra.csv"
 VENTA_FN = DATA_DIR / "venta.csv"
 TIMEZONE = "America/La_Paz"
-URL_PRODEM = "https://www.prodem.bo/Inicio"
+URL_PRODEM = "https://api.allorigins.win/raw?url=https://www.prodem.bo/Inicio"
 
 
 def normalizar_decimal(texto):
