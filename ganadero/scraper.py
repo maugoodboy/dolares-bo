@@ -6,9 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from bs4 import BeautifulSoup
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
 
 DATA_DIR = Path(__file__).resolve().parent
 COMPRA_FN = DATA_DIR / "compra.csv"
@@ -18,7 +18,7 @@ URL_GANADERO = "https://www.bg.com.bo/personas/"
 
 
 def normalizar_decimal(texto):
-    """Extrae el valor numérico en formato decimal."""
+    """Extrae el número y lo convierte a decimal estándar de Python."""
     limpio = re.search(r"(\d+[.,]\d+)", str(texto))
     if not limpio:
         raise ValueError(f"No se pudo extraer número de: {texto}")
@@ -40,20 +40,44 @@ def consultar_ganadero(session):
     soup = BeautifulSoup(response.text, "html.parser")
     texto_completo = soup.get_text(" ", strip=True)
 
-    # Búsqueda de cotización de compra y venta para USD
+    # 1. Búsqueda de Compra (T. Cambio Oficial)
+    # Busca 'T. Cambio Oficial' seguido de un número decimal
     compra_match = re.search(
-        r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+        r"T\.?\s*Cambio\s*Oficial\s*(\d+[.,]\d+)",
         texto_completo,
         re.IGNORECASE,
     )
-    venta_match = re.search(
-        r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
-        texto_completo,
-        re.IGNORECASE,
-    )
+    # Alternativa por si en el HTML dice simplemente 'compra'
+    if not compra_match:
+        compra_match = re.search(
+            r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+            texto_completo,
+            re.IGNORECASE,
+        )
 
-    valor_compra = normalizar_decimal(compra_match.group(1)) if compra_match else 6.86
-    valor_venta = normalizar_decimal(venta_match.group(1)) if venta_match else 6.96
+    # 2. Búsqueda de Venta (Valor Ref. Venta USD)
+    # Busca 'Valor Ref. Venta' seguido opcionalmente de 'USD' y del número
+    venta_match = re.search(
+        r"Valor\s*Ref\.?\s*Venta(?:\s*USD)?\s*(\d+[.,]\d+)",
+        texto_completo,
+        re.IGNORECASE,
+    )
+    # Alternativa por si en el HTML dice directamente 'venta'
+    if not venta_match:
+        venta_match = re.search(
+            r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+            texto_completo,
+            re.IGNORECASE,
+        )
+
+    # Validamos que se hayan encontrado ambos valores en la web
+    if not compra_match or not venta_match:
+        raise ValueError(
+            "No se pudieron encontrar las etiquetas de cotización en la página."
+        )
+
+    valor_compra = normalizar_decimal(compra_match.group(1))
+    valor_venta = normalizar_decimal(venta_match.group(1))
 
     fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
     return fecha_hoy, valor_compra, valor_venta
@@ -77,7 +101,9 @@ def main():
 
     consolidar(COMPRA_FN, fecha, compra)
     consolidar(VENTA_FN, fecha, venta)
-    print(f"Banco Ganadero actualizado con exito para {fecha}: Compra={compra}, Venta={venta}")
+    print(
+        f"Banco Ganadero actualizado con éxito para {fecha}: Compra={compra}, Venta={venta}"
+    )
 
 
 if __name__ == "__main__":
