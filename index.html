@@ -428,11 +428,14 @@
         const filas = texto.trim().split('\n').filter(l => l.trim() !== '');
         if (filas.length <= 1) return { valor: '-', fecha: '', hora: '' };
 
+        // Si la ruta contiene "binance", toma la columna 3 (median). Para los bancos toma la columna 1
+        const indiceColumna = rutaCsv.includes('binance') ? 3 : 1;
+
         const ultimaLinea = filas[filas.length - 1];
         const columnas = ultimaLinea.split(',');
 
         const fechaRaw = columnas[0] ? columnas[0].trim() : '';
-        const valorRaw = columnas[1] ? columnas[1].trim() : '-';
+        const valorRaw = columnas[indiceColumna] ? columnas[indiceColumna].trim() : '-';
         const { fecha, hora } = formatearFechaYHora(fechaRaw);
 
         return { valor: valorRaw, fecha, hora };
@@ -450,13 +453,15 @@
         const filas = texto.trim().split('\n').filter(l => l.trim() !== '');
         if (filas.length <= 1) return [];
 
-        // Ignora cabecera y parsea filas: [Fecha, Valor]
+        // Si la ruta contiene "binance", toma la columna 3 (median). Para los bancos toma la columna 1
+        const indiceColumna = rutaCsv.includes('binance') ? 3 : 1;
+
         const datos = [];
         for (let i = 1; i < filas.length; i++) {
           const col = filas[i].split(',');
-          if (col.length >= 2) {
+          if (col.length > indiceColumna) {
             const dateObj = new Date(col[0].trim().replace(' ', 'T'));
-            const valor = parseFloat(col[1]);
+            const valor = parseFloat(col[indiceColumna]);
             if (!isNaN(dateObj) && !isNaN(valor)) {
               datos.push({ x: dateObj, y: valor });
             }
