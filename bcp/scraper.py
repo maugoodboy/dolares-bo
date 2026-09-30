@@ -1,6 +1,7 @@
-import datetime
 import os
 import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import requests
 from bs4 import BeautifulSoup
 
@@ -16,7 +17,7 @@ def obtener_tipo_cambio_bcp():
         "Upgrade-Insecure-Requests": "1"
     }
 
-    # Valores de respaldo (actualizados según la cotización vigente del BCP)
+    # Valores de respaldo actualizados
     compra = 11.52
     venta = 12.32
 
@@ -29,7 +30,7 @@ def obtener_tipo_cambio_bcp():
             soup = BeautifulSoup(respuesta.text, "html.parser")
             texto_completo = soup.get_text()
 
-            # Buscar en el carrusel/barra inferior el patrón: "Dólar Compra: XX.XX | Dólar Venta: YY.YY"
+            # Buscar en el texto el patrón del carrusel: "Dólar Compra: XX.XX | Dólar Venta: YY.YY"
             coincidencia = re.search(r"D[oó]lar Compra:\s*([0-9.,]+)\s*\|\s*D[oó]lar Venta:\s*([0-9.,]+)", texto_completo, re.IGNORECASE)
 
             if coincidencia:
@@ -37,24 +38,36 @@ def obtener_tipo_cambio_bcp():
                 venta = float(coincidencia.group(2).replace(",", "."))
                 print("Se extrajeron los valores exitosamente del carrusel de la web.")
             else:
-                print("Aviso: Conectó a la web, pero no se encontró el carrusel de cotizaciones en el HTML estático. Se usarán valores de referencia.")
+                print("Aviso: Conectó a la web, pero no se encontró el carrusel de cotizaciones en el HTML. Se usarán valores de referencia.")
         else:
             print(f"Aviso: El servidor respondió con estado {respuesta.status_code}. Se usarán valores de referencia.")
 
     except Exception as e:
         print(f"Aviso: No se pudo conectar a la web del BCP ({e}). Se usarán valores de referencia.")
 
-    fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
+    # 1. Obtener fecha y hora exacta con la zona horaria de Bolivia (Año-Mes-Día Horas:Minutos:Segundos)
+    timestamp_actual = datetime.now(ZoneInfo("America/La_Paz")).strftime("%Y-%m-%d %H:%M:%S")
 
-    # Guardar en los archivos compra.csv y venta.csv
+    # 2. Asegurar que exista la carpeta 'bcp'
     os.makedirs("bcp", exist_ok=True)
-    with open("bcp/compra.csv", "a", encoding="utf-8") as f_compra:
-        f_compra.write(f"{fecha_hoy},{compra}\n")
-        
-    with open("bcp/venta.csv", "a", encoding="utf-8") as f_venta:
-        f_venta.write(f"{fecha_hoy},{venta}\n")
 
-    print(f"BCP procesado con exito para {fecha_hoy}: Compra={compra}, Venta={venta}")
+    # 3. Guardar en compra.csv (agrega encabezado si el archivo es nuevo)
+    archivo_compra = "bcp/compra.csv"
+    es_nuevo_compra = not os.path.exists(archivo_compra) or os.path.getsize(archivo_compra) == 0
+    with open(archivo_compra, "a", encoding="utf-8") as f_compra:
+        if es_nuevo_compra:
+            f_compra.write("timestamp,value\n")
+        f_compra.write(f"{timestamp_actual},{compra}\n")
+        
+    # 4. Guardar en venta.csv (agrega encabezado si el archivo es nuevo)
+    archivo_venta = "bcp/venta.csv"
+    es_nuevo_venta = not os.path.exists(archivo_venta) or os.path.getsize(archivo_venta) == 0
+    with open(archivo_venta, "a", encoding="utf-8") as f_venta:
+        if es_nuevo_venta:
+            f_venta.write("timestamp,value\n")
+        f_venta.write(f"{timestamp_actual},{venta}\n")
+
+    print(f"BCP procesado con exito para {timestamp_actual}: Compra={compra}, Venta={venta}")
 
 if __name__ == "__main__":
     obtener_tipo_cambio_bcp()
