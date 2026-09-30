@@ -18,7 +18,7 @@ URL_BANECO = "https://www.baneco.com.bo/"
 
 
 def normalizar_decimal(texto):
-    """Extrae el valor numérico en formato decimal."""
+    """Extrae el número y lo convierte a formato decimal con punto."""
     limpio = re.search(r"(\d+[.,]\d+)", str(texto))
     if not limpio:
         raise ValueError(f"No se pudo extraer número de: {texto}")
@@ -39,34 +39,36 @@ def consultar_baneco(session):
     response = session.get(URL_BANECO, headers=headers, timeout=25)
     response.raise_for_status()
 
-    # Limpiamos el texto completo de la página unificando espacios
     soup = BeautifulSoup(response.text, "html.parser")
-    texto = " ".join(soup.stripped_strings)
 
-    # 1. Búsqueda principal: texto entre "Banco Económico por Dólar" hasta "Unidad de Fomento" o "Compra... Venta..."
-    patron_especifico = re.search(
-        r"Banco\s+Econ[oó]mico\s+por\s+D[oó]lar.*?Compra\s*:\s*(\d+[.,]\d+).*?Venta\s*:\s*(\d+[.,]\d+)",
-        texto,
+    # 1. Buscamos primero en el footer (pie de página)
+    footer_element = soup.find("footer") or soup.find(class_=re.compile(r"footer", re.IGNORECASE))
+    
+    if footer_element:
+        texto_busqueda = " ".join(footer_element.stripped_strings)
+    else:
+        texto_busqueda = " ".join(soup.stripped_strings)
+
+    # 2. Buscamos el texto exacto del Banco Económico en el footer
+    patron = re.search(
+        r"Banco\s+Econ[oó]mico\s+por\s+D[oó]lar.*?Compra\s*:\s*(\d+[.,]\d+)\s*[-–—]\s*Venta\s*:\s*(\d+[.,]\d+)",
+        texto_busqueda,
         re.IGNORECASE | re.DOTALL,
     )
 
-    if patron_especifico:
-        valor_compra = normalizar_decimal(patron_especifico.group(1))
-        valor_venta = normalizar_decimal(patron_especifico.group(2))
-    else:
-        # 2. Búsqueda secundaria flexible: busca cualquier 'Compra: XX - Venta: YY'
-        patron_bloque = re.search(
+    # 3. Si no encuentra con el título largo, busca directo cualquier 'Compra: X - Venta: Y'
+    if not patron:
+        patron = re.search(
             r"Compra\s*:\s*(\d+[.,]\d+)\s*[-–—]\s*Venta\s*:\s*(\d+[.,]\d+)",
-            texto,
+            texto_busqueda,
             re.IGNORECASE,
         )
-        if patron_bloque:
-            valor_compra = normalizar_decimal(patron_bloque.group(1))
-            valor_venta = normalizar_decimal(patron_bloque.group(2))
-        else:
-            raise RuntimeError(
-                f"No se encontraron las cotizaciones en el texto procesado. Inicio del texto: {texto[:300]}"
-            )
+
+    if not patron:
+        raise RuntimeError("No se encontró el bloque de cotizaciones dentro del footer.")
+
+    valor_compra = normalizar_decimal(patron.group(1))
+    valor_venta = normalizar_decimal(patron.group(2))
 
     fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
     return fecha_hoy, valor_compra, valor_venta
