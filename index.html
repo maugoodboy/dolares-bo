@@ -667,6 +667,12 @@
             },
             y: {
               min: 7, // Eje Y inicia en 7 Bs
+              title: {
+                display: true,
+                text: 'En Bolivianos',
+                color: '#6b7280',
+                font: { size: 11, weight: '600' }
+              },
               grid: { color: '#f3f4f6' },
               ticks: { font: { size: 10 }, color: '#6b7280' }
             }
@@ -695,7 +701,6 @@
       datos = aplicarFiltroRango(datos, rangoIndividual);
 
       chartIndividual.data.datasets[0].data = datos;
-      // Toma el color oficial de la entidad elegida
       chartIndividual.data.datasets[0].borderColor = (bancoObj && bancoObj.color) ? bancoObj.color : '#2563eb';
       chartIndividual.update();
     }
@@ -734,7 +739,13 @@
               ticks: { font: { size: 10 }, color: '#6b7280' }
             },
             y: {
-              min: 7, // Eje Y inicia en 7 Bs
+              min: 9, // Eje Y configurado desde 9 Bs para distinguir diferencias
+              title: {
+                display: true,
+                text: 'En Bolivianos',
+                color: '#6b7280',
+                font: { size: 11, weight: '600' }
+              },
               grid: { color: '#f3f4f6' },
               ticks: { font: { size: 10 }, color: '#6b7280' }
             }
