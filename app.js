@@ -1,8 +1,8 @@
 const entidades = [
   { id: 'oficial', nombre: 'Banco Central de Bolivia (BCB)', color: '#002B49', domain: 'https://www.bcb.gob.bo/', iniciales: 'BCB' },
   { id: 'banco_union', nombre: 'Banco Unión', color: '#003A70', domain: 'https://www.bancounion.com.bo', iniciales: 'BU' },
-  { id: 'bnb', nombre: 'BNB', color: '#00853F', domain: 'https://www.bnb.com.bo/PortalBNB/Principal/BancaPersonas', iniciales: 'BNB' },
-  { id: 'bmsc', nombre: 'Banco Mercantil Santa Cruz', color: '#F37021', domain: 'https://www.bmsc.com.bo/', iniciales: 'MSC' },
+  { id: 'bnb', nombre: 'Banco Nacional de Bolivia (BNB)', color: '#00853F', domain: 'https://www.bnb.com.bo/PortalBNB/Principal/BancaPersonas', iniciales: 'BNB' },
+  { id: 'bmsc', nombre: 'Banco Mercantil Santa Cruz (BMSC)', color: '#F37021', domain: 'https://www.bmsc.com.bo/', iniciales: 'BMSC' },
   { id: 'bisa', nombre: 'Banco BISA', color: '#FFD100', domain: 'https://www.bisa.com/home', iniciales: 'BIS' },
   { id: 'ganadero', nombre: 'Banco Ganadero', color: '#CC0000', domain: 'https://www.bg.com.bo', iniciales: 'BG' },
   { id: 'bancosol', nombre: 'Banco Sol', color: '#E4007D', domain: 'https://www.bancosol.com.bo', iniciales: 'SOL' },
@@ -11,8 +11,6 @@ const entidades = [
   { id: 'bco', nombre: 'Banco de la Comunidad', color: '#1B5E20', domain: 'https://www.bco.com.bo/', iniciales: 'BCO' },
   { id: 'bcp', nombre: 'Banco de Crédito Bolivia (BCP)', color: '#002A61', domain: 'https://www.bcp.com.bo', iniciales: 'BCP' },
   { id: 'prodem', nombre: 'Banco Prodem', color: '#007A33', domain: 'https://www.prodem.bo/Inicio', iniciales: 'PRD' },
-  { id: 'fie', nombre: 'Banco FIE', color: '#E2001A', domain: 'https://www.bancofie.com.bo/', iniciales: 'FIE' },
-  { id: 'fortaleza', nombre: 'Banco Fortaleza', color: '#004B87', domain: 'https://www.bancofortaleza.com.bo/', iniciales: 'FOR' },
   { id: 'binance', nombre: 'Binance (USDT-P2P)', color: '#F3BA2F', domain: 'https://p2p.binance.com/', iniciales: 'BIN' }
 ];
 
