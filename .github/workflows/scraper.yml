@@ -1,93 +1,96 @@
 name: Actualizar todos los bancos, oficial y binance
 
 on:
-  schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+schedule:
+- cron: '0 11 * * *'
+- cron: '1 16 * * *'
+workflow_dispatch:
 
 permissions:
-  contents: write
+contents: write
 
 jobs:
-  run-scraper:
-    runs-on: ubuntu-latest
+run-scraper:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Descargar el repositorio
-        uses: actions/checkout@v4
+```
+steps:
+  - name: Descargar el repositorio
+    uses: actions/checkout@v4
 
-      - name: Instalar Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+  - name: Instalar Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: '3.11'
 
-      - name: Instalar librerias necesarias
-        run: |
-          pip install requests pandas beautifulsoup4 urllib3
+  - name: Instalar librerias necesarias
+    run: |
+      pip install requests pandas beautifulsoup4 urllib3
 
-      - name: Ejecutar scraper de Binance
-        continue-on-error: true
-        run: python binance/scraper.py
+  - name: Ejecutar scraper de Binance
+    continue-on-error: true
+    run: python binance/scraper.py
 
-      - name: Ejecutar scraper de BCB Oficial
-        continue-on-error: true
-        run: python oficial/scraper.py
+  - name: Ejecutar scraper de BCB Oficial
+    continue-on-error: true
+    run: python oficial/scraper.py
 
-      - name: Ejecutar scraper de BCP
-        continue-on-error: true
-        run: python bcp/scraper.py
+  - name: Ejecutar scraper de BCP
+    continue-on-error: true
+    run: python bcp/scraper.py
 
-      - name: Ejecutar scraper de BNB
-        continue-on-error: true
-        run: python bnb/scraper.py
+  - name: Ejecutar scraper de BNB
+    continue-on-error: true
+    run: python bnb/scraper.py
 
-      - name: Ejecutar scraper de Banco Union
-        continue-on-error: true
-        run: python banco_union/scraper.py
+  - name: Ejecutar scraper de Banco Union
+    continue-on-error: true
+    run: python banco_union/scraper.py
 
-      - name: Ejecutar scraper de Prodem
-        continue-on-error: true
-        run: python prodem/scraper.py
+  - name: Ejecutar scraper de Prodem
+    continue-on-error: true
+    run: python prodem/scraper.py
 
-      - name: Ejecutar scraper de BMSC
-        continue-on-error: true
-        run: python bmsc/scraper.py
+  - name: Ejecutar scraper de BMSC
+    continue-on-error: true
+    run: python bmsc/scraper.py
 
-      - name: Ejecutar scraper de Baneco
-        continue-on-error: true
-        run: python baneco/scraper.py
+  - name: Ejecutar scraper de Baneco
+    continue-on-error: true
+    run: python baneco/scraper.py
 
-      - name: Ejecutar scraper de Ganadero
-        continue-on-error: true
-        run: python ganadero/scraper.py
+  - name: Ejecutar scraper de Ganadero
+    continue-on-error: true
+    run: python ganadero/scraper.py
 
-      - name: Ejecutar scraper de BISA
-        continue-on-error: true
-        run: python bisa/scraper.py
+  - name: Ejecutar scraper de BISA
+    continue-on-error: true
+    run: python bisa/scraper.py
 
-      - name: Ejecutar scraper de BancoSol
-        continue-on-error: true
-        run: python bancosol/scraper.py
+  - name: Ejecutar scraper de BancoSol
+    continue-on-error: true
+    run: python bancosol/scraper.py
 
-      # - name: Ejecutar scraper de Fortaleza
-      #  continue-on-error: true
-       # run: python fortaleza/scraper.py
+  # - name: Ejecutar scraper de Fortaleza
+  #   continue-on-error: true
+  #   run: python fortaleza/scraper.py
 
-      #- name: Ejecutar scraper de FIE
-      #  continue-on-error: true
-       # run: python fie/scraper.py
+  # - name: Ejecutar scraper de FIE
+  #   continue-on-error: true
+  #   run: python fie/scraper.py
 
-      - name: Ejecutar scraper de Banco de la Comunidad
-        continue-on-error: true
-        run: python bco/scraper.py
+  - name: Ejecutar scraper de Banco de la Comunidad
+    continue-on-error: true
+    run: python bco/scraper.py
 
-      - name: Ejecutar scraper de Ecofuturo
-        continue-on-error: true
-        run: python ecofuturo/scraper.py
+  - name: Ejecutar scraper de Ecofuturo
+    continue-on-error: true
+    run: python ecofuturo/scraper.py
 
-      - name: Guardar los archivos CSV en el repositorio
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add */*.csv
-          git diff --quiet && git diff --staged --quiet || (git commit -m "[ci] actualizar todas las cotizaciones" && git push)
+  - name: Guardar los archivos CSV en el repositorio
+    run: |
+      git config --global user.name "github-actions[bot]"
+      git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      git add */*.csv
+      git diff --quiet && git diff --staged --quiet || (git commit -m "[ci] actualizar todas las cotizaciones" && git push)
+```
