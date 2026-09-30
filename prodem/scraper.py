@@ -76,9 +76,10 @@ def consultar_prodem(session):
 
                     compra, venta = extraer_desde_texto(texto)
                     if compra and venta:
-                        fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
+                        # Se registra tanto la fecha como la hora exacta de Bolivia
+                        fecha_hora = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
                         print(f"Cotización encontrada: Compra={compra}, Venta={venta}")
-                        return fecha_hoy, compra, venta
+                        return fecha_hora, compra, venta
             except requests.exceptions.RequestException as e:
                 print(f"Aviso en intento {intento}: {e}")
             time.sleep(3)
@@ -87,9 +88,9 @@ def consultar_prodem(session):
     return None, None, None
 
 
-def consolidar(fn, fecha, valor):
+def consolidar(fn, fecha_hora, valor):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    nuevo_dato = pd.DataFrame([{"timestamp": fecha, "value": valor}])
+    nuevo_dato = pd.DataFrame([{"timestamp": fecha_hora, "value": valor}])
 
     if fn.exists():
         df_existente = pd.read_csv(fn)
@@ -101,12 +102,12 @@ def consolidar(fn, fecha, valor):
 
 def main():
     with requests.Session() as session:
-        fecha, compra, venta = consultar_prodem(session)
+        fecha_hora, compra, venta = consultar_prodem(session)
 
-    # Si hubo problemas temporales de conexión, respalda con el último valor o el actual conocido
-    if fecha is None:
-        fecha = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
-        print(f"Usando valores de respaldo para la fecha {fecha}.")
+    # Si hubo problemas de conexión, se usa la fecha y hora actual con los valores de respaldo
+    if fecha_hora is None:
+        fecha_hora = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
+        print(f"Usando valores de respaldo para: {fecha_hora}.")
         try:
             df_compra = pd.read_csv(COMPRA_FN)
             compra = float(df_compra["value"].iloc[-1])
@@ -119,9 +120,9 @@ def main():
         except Exception:
             venta = 12.12
 
-    consolidar(COMPRA_FN, fecha, compra)
-    consolidar(VENTA_FN, fecha, venta)
-    print(f"Banco Prodem actualizado con éxito para {fecha}: Compra={compra}, Venta={venta}")
+    consolidar(COMPRA_FN, fecha_hora, compra)
+    consolidar(VENTA_FN, fecha_hora, venta)
+    print(f"Banco Prodem actualizado con éxito para {fecha_hora}: Compra={compra}, Venta={venta}")
 
 
 if __name__ == "__main__":
