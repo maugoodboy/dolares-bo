@@ -2,6 +2,7 @@
 """Scraper de tipo de cambio publicado por Banco FIE."""
 
 import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -10,7 +11,6 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-# Configuración de carpetas y enlaces
 DATA_DIR = Path(__file__).resolve().parent
 COMPRA_FN = DATA_DIR / "compra.csv"
 VENTA_FN = DATA_DIR / "venta.csv"
@@ -18,8 +18,14 @@ TIMEZONE = "America/La_Paz"
 URL_FIE = "https://www.bancofie.com.bo/"
 
 
+def quitar_tildes(texto):
+    """Elimina tildes y normaliza caracteres especiales a texto plano."""
+    texto_norm = unicodedata.normalize("NFKD", texto)
+    return "".join(c for c in texto_norm if not unicodedata.combining(c))
+
+
 def normalizar_decimal(texto):
-    """Convierte texto como '11,52' a número decimal 11.52."""
+    """Convierte texto como '11,52' a número decimal float (11.52)."""
     limpio = re.search(r"(\d+[.,]\d+)", str(texto))
     if not limpio:
         raise ValueError(f"No se pudo extraer número de: {texto}")
@@ -27,27 +33,18 @@ def normalizar_decimal(texto):
 
 
 def extraer_valores(texto):
-    """Busca compra y venta en el texto con reglas flexibles."""
-    # 1. Búsqueda prioritaria: 'Dólar Compra: 11,52' y 'Dólar Venta: 12,02'
-    compra = re.search(
-        r"d[oó]lar[^\d]{1,40}?compra[^\d]{1,40}?(\d+[.,]\d+)",
-        texto,
-        re.IGNORECASE,
-    )
-    venta = re.search(
-        r"d[oó]lar[^\d]{1,40}?venta[^\d]{1,40}?(\d+[.,]\d+)",
-        texto,
-        re.IGNORECASE,
-    )
+    """Extrae compra y venta de forma robusta e insensible a tildes o mayúsculas."""
+    texto_plano = quitar_tildes(texto).lower()
 
-    # 2. Búsqueda de respaldo si no lleva la palabra 'dólar' pegada
-    if not compra:
-        compra = re.search(r"compra[^\d]{1,40}?(\d+[.,]\d+)", texto, re.IGNORECASE)
-    if not venta:
-        venta = re.search(r"venta[^\d]{1,40}?(\d+[.,]\d+)", texto, re.IGNORECASE)
+    # Busca: 'compra' seguido opcionalmente de ':', espacios y el número decimal
+    compra_match = re.search(r"compra\s*[:\-]?\s*(\d+[.,]\d+)", texto_plano)
+    
+    # Busca: 'venta' seguido opcionalmente de ':', espacios y el número decimal
+    venta_match = re.search(r"venta\s*[:\-]?\s*(\d+[.,]\d+)", texto_plano)
 
-    val_compra = normalizar_decimal(compra.group(1)) if compra else None
-    val_venta = normalizar_decimal(venta.group(1)) if venta else None
+    val_compra = normalizar_decimal(compra_match.group(1)) if compra_match else None
+    val_venta = normalizar_decimal(venta_match.group(1)) if venta_match else None
+
     return val_compra, val_venta
 
 
@@ -62,34 +59,21 @@ def consultar_fie(session):
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "es-ES,es;q=0.9",
     }
-    
+
     response = session.get(URL_FIE, headers=headers, timeout=30)
     response.raise_for_status()
 
-    # Asegurar codificación correcta en español
+    # Ajuste automático de codificación para evitar caracteres rotos
     response.encoding = response.apparent_encoding or "utf-8"
 
     soup = BeautifulSoup(response.text, "html.parser")
-    
-    # Unificar texto y reemplazar espacios especiales o saltos de línea por un espacio simple
-    texto_limpio = " ".join(soup.get_text(" ", strip=True).split())
+    # Unir todo el texto visible normalizando saltos y espacios
+    texto_limpio = " ".join(soup.get_text().split())
 
-    # Intento 1: Buscar en el texto visible
     valor_compra, valor_venta = extraer_valores(texto_limpio)
 
-    # Intento 2: Si no lo halló en el texto visible, buscar directamente en el código HTML
     if valor_compra is None or valor_venta is None:
-        html_limpio = " ".join(response.text.split())
-        c_html, v_html = extraer_valores(html_limpio)
-        valor_compra = valor_compra or c_html
-        valor_venta = valor_venta or v_html
-
-    # Si aún no se encuentran, mostrar información de depuración
-    if valor_compra is None or valor_venta is None:
-        titulo = soup.title.string.strip() if soup.title else "Sin título"
-        print(f"[DEBUG] Título de la página recibida: {titulo}")
-        print(f"[DEBUG] Primeros 300 caracteres del texto: {texto_limpio[:300]}")
-        raise ValueError("No se pudieron encontrar las cotizaciones de compra o venta en la página de FIE.")
+        raise ValueError("No se pudieron encontrar las cotizaciones de compra o venta en la página de Banco FIE.")
 
     fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
     return fecha_hoy, valor_compra, valor_venta
