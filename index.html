@@ -4,8 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cotizaciones del Dólar en Bolivia</title>
-  
-  <!-- Estilos visuales minimalistas idénticos al proyecto de referencia -->
+
+  <!-- Librería para el gráfico histórico (Chart.js + adaptador de fechas) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
   <style>
     :root {
       --bg: #ffffff;
@@ -15,6 +18,7 @@
       --border-color: #e5e7eb;
       --highlight: #2563eb;
       --green: #15803d;
+      --red: #dc2626;
     }
 
     * {
@@ -27,18 +31,18 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background-color: var(--bg);
       color: var(--text-main);
-      padding: 30px 15px;
+      padding: 25px 15px;
       display: flex;
       justify-content: center;
     }
 
     .container {
       width: 100%;
-      max-width: 680px;
+      max-width: 720px;
     }
 
     header {
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       border-bottom: 1px solid var(--border-color);
       padding-bottom: 16px;
     }
@@ -55,11 +59,50 @@
       font-size: 0.9rem;
     }
 
-    /* Tabla de cotizaciones */
+    /* Pestañas de navegación */
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      background-color: #f3f4f6;
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      background-color: #f3f4f6;
+      color: var(--highlight);
+    }
+
+    .page-section {
+      display: none;
+    }
+
+    .page-section.active {
+      display: block;
+    }
+
+    /* Tablas */
     .table-container {
       border: 1px solid var(--border-color);
       border-radius: 8px;
-      overflow: hidden;
+      overflow-x: auto;
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
 
@@ -75,11 +118,11 @@
     }
 
     th {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--text-muted);
-      padding: 12px 16px;
+      padding: 12px 14px;
       font-weight: 600;
     }
 
@@ -101,8 +144,8 @@
     }
 
     td {
-      padding: 12px 16px;
-      font-size: 0.95rem;
+      padding: 12px 14px;
+      font-size: 0.92rem;
     }
 
     .bank-name {
@@ -120,8 +163,97 @@
       color: var(--text-muted);
     }
 
+    /* Controles de la página Histórica */
+    .chart-controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .btn-group {
+      display: inline-flex;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .btn-group button {
+      background: white;
+      border: none;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      color: var(--text-muted);
+      border-right: 1px solid var(--border-color);
+    }
+
+    .btn-group button:last-child {
+      border-right: none;
+    }
+
+    .btn-group button.active {
+      background: #eff6ff;
+      color: var(--highlight);
+      font-weight: 600;
+    }
+
+    .select-entidad {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      font-size: 0.85rem;
+      color: var(--text-main);
+      background-color: white;
+      outline: none;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      width: 100%;
+      height: 360px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--card-bg);
+    }
+
+    /* Estilos Metodología */
+    .methodology-card {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 24px;
+      background: var(--card-bg);
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    .methodology-card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+      color: var(--text-main);
+    }
+
+    .methodology-card h3 {
+      font-size: 1rem;
+      margin: 18px 0 8px 0;
+      color: var(--text-main);
+    }
+
+    .methodology-card p {
+      margin-bottom: 12px;
+      color: #374151;
+    }
+
+    .methodology-card ul {
+      margin-left: 20px;
+      margin-bottom: 14px;
+      color: #374151;
+    }
+
     .footer {
-      margin-top: 18px;
+      margin-top: 24px;
       text-align: center;
       font-size: 0.8rem;
       color: var(--text-muted);
@@ -133,24 +265,88 @@
   <div class="container">
     <header>
       <h1>Dólar en Bolivia</h1>
-      <p class="subtitle">Cotizaciones en tiempo real extraídas de entidades financieras</p>
+      <p class="subtitle">Seguimiento de cotizaciones del dólar oficial, bancario y digital en tiempo real</p>
     </header>
 
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Entidad</th>
-            <th class="num">Compra</th>
-            <th class="num">Venta</th>
-            <th class="num">Actualizado</th>
-          </tr>
-        </thead>
-        <tbody id="cotizaciones-cuerpo">
-          <!-- Las filas se rellenan solas con el script -->
-        </tbody>
-      </table>
-    </div>
+    <!-- Pestañas -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" onclick="cambiarPagina('diaria', this)">Cotizaciones del Día</button>
+      <button class="tab-btn" onclick="cambiarPagina('historico', this)">Evolución Histórica</button>
+      <button class="tab-btn" onclick="cambiarPagina('metodologia', this)">Metodología</button>
+    </nav>
+
+    <!-- ==================== PÁGINA 1: TABLA DIARIA ==================== -->
+    <section id="pag-diaria" class="page-section active">
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Entidad</th>
+              <th class="num">Compra</th>
+              <th class="num">Venta</th>
+              <th class="num">Fecha</th>
+              <th class="num">Hora</th>
+            </tr>
+          </thead>
+          <tbody id="cotizaciones-cuerpo">
+            <!-- Rellenado dinámicamente con JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== PÁGINA 2: HISTÓRICO ==================== -->
+    <section id="pag-historico" class="page-section">
+      <div class="chart-controls">
+        <select id="select-banco" class="select-entidad" onchange="actualizarGrafico()">
+          <!-- Opciones agregadas por JS -->
+        </select>
+
+        <div style="display: flex; gap: 8px;">
+          <div class="btn-group">
+            <button id="btn-compra" class="active" onclick="setTipoOperacion('compra')">Compra</button>
+            <button id="btn-venta" onclick="setTipoOperacion('venta')">Venta</button>
+          </div>
+
+          <div class="btn-group">
+            <button class="btn-rango" onclick="setRango(7, this)">7D</button>
+            <button class="btn-rango" onclick="setRango(30, this)">1M</button>
+            <button class="btn-rango active" onclick="setRango(0, this)">Todo</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-wrapper">
+        <canvas id="canvasHistorico"></canvas>
+      </div>
+    </section>
+
+    <!-- ==================== PÁGINA 3: METODOLOGÍA ==================== -->
+    <section id="pag-metodologia" class="page-section">
+      <div class="methodology-card">
+        <h2>Metodología de Extracción y Estimación</h2>
+        <p>
+          Este observatorio monitorea continuamente las variaciones de la divisa estadounidense (USD) en Bolivia en sus distintas vertientes: el tipo de cambio oficial, las mesas de dinero bancarias y el mercado P2P (USDT).
+        </p>
+
+        <h3>1. Fuentes de Datos</h3>
+        <ul>
+          <li><strong>Banco Central de Bolivia (BCB):</strong> Se extrae el tipo de cambio regulado oficial (6.86 compra / 6.96 venta).</li>
+          <li><strong>Banca Múltiple:</strong> Cotizaciones publicadas en los portales web y tableros oficiales de las entidades supervisadas por ASFI.</li>
+          <li><strong>Binance P2P (Dólar Digital / USDT):</strong> Datos extraídos del libro de órdenes entre pares en Bolivia.</li>
+        </ul>
+
+        <h3>2. Frecuencia y Automatización</h3>
+        <p>
+          Los datos se actualizan de forma programada mediante <em>GitHub Actions</em> cada cierto intervalo de tiempo. Los resultados se serializan en archivos planos <code>.csv</code> dentro del repositorio para garantizar disponibilidad pública y sin intermediarios.
+        </p>
+
+        <h3>3. Dólar Paralelo y P2P</h3>
+        <p>
+          A diferencia del sistema bancario tradicional que maneja un precio estático de referencia, Binance P2P cuenta con un libro de órdenes abierto. Para representar la cotización se toma en cuenta el precio de las órdenes activas de mayor liquidez y disponibilidad inmediata en el mercado boliviano.
+        </p>
+      </div>
+    </section>
 
     <div class="footer">
       Datos recopilados automáticamente vía GitHub Actions.
@@ -158,7 +354,9 @@
   </div>
 
   <script>
-    // Lista de entidades y nombres visibles
+    // ==========================================
+    // 1. CONFIGURACIÓN Y LISTA DE ENTIDADES
+    // ==========================================
     const entidades = [
       { id: 'oficial', nombre: 'Oficial (BCB)' },
       { id: 'banco_union', nombre: 'Banco Unión' },
@@ -172,30 +370,110 @@
       { id: 'binance', nombre: 'Binance P2P' }
     ];
 
-    // Lee el archivo CSV y extrae el último número registrado
+    // Variables de estado del gráfico
+    let chartInstance = null;
+    let operacionSeleccionada = 'compra';
+    let diasRango = 0; // 0 = Todo
+
+    // ==========================================
+    // 2. NAVEGACIÓN ENTRE PÁGINAS
+    // ==========================================
+    function cambiarPagina(idPagina, btn) {
+      document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+      document.getElementById(`pag-${idPagina}`).classList.add('active');
+      btn.classList.add('active');
+
+      if (idPagina === 'historico' && !chartInstance) {
+        inicializarGrafico();
+      }
+    }
+
+    // ==========================================
+    // 3. LECTURA DE CSVs
+    // ==========================================
+    // Función auxiliar para separar fecha y hora del formato recibido (ej: "2024-05-15 14:30:00" o formato ISO)
+    function formatearFechaYHora(timestampStr) {
+      if (!timestampStr) return { fecha: '—', hora: '—' };
+      
+      const partes = timestampStr.trim().split(' ');
+      if (partes.length >= 2) {
+        return {
+          fecha: partes[0],
+          hora: partes[1].substring(0, 5) // HH:MM
+        };
+      }
+      
+      // Si viene con formato ISO (con T)
+      if (timestampStr.includes('T')) {
+        const d = new Date(timestampStr);
+        if (!isNaN(d)) {
+          return {
+            fecha: d.toISOString().split('T')[0],
+            hora: d.toTimeString().substring(0, 5)
+          };
+        }
+      }
+
+      return { fecha: timestampStr, hora: '—' };
+    }
+
     async function leerUltimaFila(rutaCsv) {
       try {
         const respuesta = await fetch(rutaCsv + '?t=' + Date.now());
-        if (!respuesta.ok) return { valor: '-', fecha: '' };
-        
+        if (!respuesta.ok) return { valor: '-', fecha: '', hora: '' };
+
         const texto = await respuesta.text();
-        const filas = texto.trim().split('\n').filter(linea => linea.trim() !== '');
-        if (filas.length <= 1) return { valor: '-', fecha: '' };
+        const filas = texto.trim().split('\n').filter(l => l.trim() !== '');
+        if (filas.length <= 1) return { valor: '-', fecha: '', hora: '' };
 
         const ultimaLinea = filas[filas.length - 1];
         const columnas = ultimaLinea.split(',');
 
-        return {
-          valor: columnas[1] ? columnas[1].trim() : columnas[0].trim(),
-          fecha: columnas[0] ? columnas[0].trim() : ''
-        };
+        const fechaRaw = columnas[0] ? columnas[0].trim() : '';
+        const valorRaw = columnas[1] ? columnas[1].trim() : '-';
+        const { fecha, hora } = formatearFechaYHora(fechaRaw);
+
+        return { valor: valorRaw, fecha, hora };
       } catch (e) {
-        return { valor: '-', fecha: '' };
+        return { valor: '-', fecha: '', hora: '' };
       }
     }
 
+    async function leerTodoElCsv(rutaCsv) {
+      try {
+        const respuesta = await fetch(rutaCsv + '?t=' + Date.now());
+        if (!respuesta.ok) return [];
+
+        const texto = await respuesta.text();
+        const filas = texto.trim().split('\n').filter(l => l.trim() !== '');
+        if (filas.length <= 1) return [];
+
+        // Ignora cabecera y parsea filas: [Fecha, Valor]
+        const datos = [];
+        for (let i = 1; i < filas.length; i++) {
+          const col = filas[i].split(',');
+          if (col.length >= 2) {
+            const dateObj = new Date(col[0].trim().replace(' ', 'T'));
+            const valor = parseFloat(col[1]);
+            if (!isNaN(dateObj) && !isNaN(valor)) {
+              datos.push({ x: dateObj, y: valor });
+            }
+          }
+        }
+        return datos;
+      } catch (e) {
+        return [];
+      }
+    }
+
+    // ==========================================
+    // 4. CARGA DE TABLA DIARIA
+    // ==========================================
     async function cargarTabla() {
       const cuerpo = document.getElementById('cotizaciones-cuerpo');
+      cuerpo.innerHTML = '';
 
       for (const banco of entidades) {
         const fila = document.createElement('tr');
@@ -205,24 +483,126 @@
           <td class="num rate" id="c-${banco.id}">...</td>
           <td class="num rate" id="v-${banco.id}">...</td>
           <td class="num date-col" id="f-${banco.id}">...</td>
+          <td class="num date-col" id="h-${banco.id}">...</td>
         `;
         cuerpo.appendChild(fila);
 
-        // Consultamos compra y venta al mismo tiempo
         Promise.all([
           leerUltimaFila(`./${banco.id}/compra.csv`),
           leerUltimaFila(`./${banco.id}/venta.csv`)
         ]).then(([compra, venta]) => {
           document.getElementById(`c-${banco.id}`).textContent = compra.valor !== '-' ? compra.valor : '—';
           document.getElementById(`v-${banco.id}`).textContent = venta.valor !== '-' ? venta.valor : '—';
-          
-          const fechaStr = venta.fecha || compra.fecha;
-          document.getElementById(`f-${banco.id}`).textContent = fechaStr || '—';
+
+          const fechaFinal = venta.fecha !== '—' ? venta.fecha : compra.fecha;
+          const horaFinal = venta.hora !== '—' ? venta.hora : compra.hora;
+
+          document.getElementById(`f-${banco.id}`).textContent = fechaFinal;
+          document.getElementById(`h-${banco.id}`).textContent = horaFinal;
         });
       }
     }
 
-    // Ejecutar al cargar la página
+    // ==========================================
+    // 5. GRÁFICO HISTÓRICO (Chart.js)
+    // ==========================================
+    function popularSelectBancos() {
+      const select = document.getElementById('select-banco');
+      select.innerHTML = '';
+      entidades.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.id;
+        opt.textContent = e.nombre;
+        select.appendChild(opt);
+      });
+      select.value = 'binance'; // Por defecto Binance para ver fluctuación
+    }
+
+    function inicializarGrafico() {
+      popularSelectBancos();
+      const ctx = document.getElementById('canvasHistorico').getContext('2d');
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          datasets: [{
+            label: 'Cotización (Bs)',
+            data: [],
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.05)',
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            fill: true,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          scales: {
+            x: {
+              type: 'time',
+              grid: { display: false },
+              ticks: { font: { size: 10 }, color: '#6b7280' }
+            },
+            y: {
+              grid: { color: '#f3f4f6' },
+              ticks: { font: { size: 10 }, color: '#6b7280' }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (context) => ` Bs. ${context.parsed.y.toFixed(2)}`
+              }
+            }
+          }
+        }
+      });
+
+      actualizarGrafico();
+    }
+
+    async function actualizarGrafico() {
+      if (!chartInstance) return;
+
+      const bancoId = document.getElementById('select-banco').value;
+      const ruta = `./${bancoId}/${operacionSeleccionada}.csv`;
+      let datos = await leerTodoElCsv(ruta);
+
+      // Filtrar por rango si está seleccionado (7D o 30D)
+      if (diasRango > 0 && datos.length > 0) {
+        const limiteTiempo = new Date();
+        limiteTiempo.setDate(limiteTiempo.getDate() - diasRango);
+        datos = datos.filter(d => d.x >= limiteTiempo);
+      }
+
+      chartInstance.data.datasets[0].data = datos;
+      chartInstance.data.datasets[0].borderColor = operacionSeleccionada === 'compra' ? '#15803d' : '#2563eb';
+      chartInstance.update();
+    }
+
+    function setTipoOperacion(tipo) {
+      operacionSeleccionada = tipo;
+      document.getElementById('btn-compra').classList.toggle('active', tipo === 'compra');
+      document.getElementById('btn-venta').classList.toggle('active', tipo === 'venta');
+      actualizarGrafico();
+    }
+
+    function setRango(dias, btn) {
+      diasRango = dias;
+      document.querySelectorAll('.btn-rango').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      actualizarGrafico();
+    }
+
+    // Inicializar la tabla en cuanto cargue el DOM
     cargarTabla();
   </script>
 </body>
