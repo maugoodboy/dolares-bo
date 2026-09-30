@@ -319,7 +319,7 @@
   <div class="container">
     <header>
       <h1>Dólar en Bolivia</h1>
-      <p class="subtitle">Seguimiento de cotizaciones del dólar oficial, bancario y digital en tiempo real</p>
+      <p class="subtitle">Seguimiento de cotizaciones del dólar oficial, tipo de cambio en entidades bancarias y plataformas digitales con actualizaciones diarias</p>
     </header>
 
     <!-- Barra de Navegación de 4 Pestañas -->
@@ -406,25 +406,25 @@
       <div class="methodology-card">
         <h2>Metodología de Extracción y Estimación</h2>
         <p>
-          Este observatorio monitorea continuamente las variaciones de la divisa estadounidense (USD) en Bolivia en sus distintas modalidades: el tipo de cambio oficial, el sistema bancario comercial y el mercado digital entre pares (P2P USDT).
+          Este observatorio monitorea continuamente (actualizada cada hora) las variaciones del dólar estadounidense (USD) en Bolivia en sus distintas modalidades: el tipo de cambio oficial, el sistema bancario comercial y el mercado digital entre pares (BINANCE P2P USDT).
         </p>
 
         <h3>1. Fuentes de Información</h3>
         <ul>
-          <li><strong>Banco Central de Bolivia (BCB):</strong> Se extrae el tipo de cambio regulado oficial.</li>
-          <li><strong>Banca Múltiple:</strong> Cotizaciones oficiales publicadas por cada entidad bancaria regulada por la ASFI.</li>
-          <li><strong>Binance P2P (USDT):</strong> Datos extraídos del mercado digital P2P en Bolivia, tomando como referencia el valor mediano de las órdenes con disponibilidad inmediata.</li>
+          <li><strong>Banco Central de Bolivia (BCB):</strong> Se extrae el tipo de cambio oficial publicado diariamente en la página oficial del BCB <em>www.bcb.gob.bo/</em>.</li>
+          <li><strong>Bancos Comerciales en Bolivia:</strong> Datos oficiales publicados por cada entidad bancaria regulada por la ASFI en sus páginas web oficiales.</li>
+          <li><strong>Binance P2P (USDT):</strong> Datos extraídos del mercado digital P2P de BINANCE en Bolivia, tomando como referencia el valor mediano de las órdenes con disponibilidad inmediata.</li>
         </ul>
 
         <h3>2. Frecuencia y Almacenamiento</h3>
         <p>
-          La recopilación se ejecuta automáticamente cada pocos minutos mediante <em>GitHub Actions</em>. Cada consulta se procesa e inserta de forma secuencial en archivos históricos <code>.csv</code> dentro del repositorio.
+          La recopilación se ejecuta automáticamente cada hora <em>GitHub Actions</em>. Cada consulta se procesa e inserta de forma secuencial en archivos históricos <code>.csv</code> dentro del repositorio.
         </p>
       </div>
     </section>
 
     <div class="footer">
-      Datos recopilados automáticamente vía GitHub Actions.
+      Creado por @maugoodboy // MIT Licence
     </div>
   </div>
 
