@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scraper de tipo de cambio publicado por Banco Fortaleza usando navegador automatizado."""
+"""Scraper de tipo de cambio publicado por Banco Fortaleza."""
 
 import re
 import unicodedata
@@ -8,17 +8,18 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-from playwright.sync_api import sync_playwright
+import requests
+from bs4 import BeautifulSoup
 
 DATA_DIR = Path(__file__).resolve().parent
 COMPRA_FN = DATA_DIR / "compra.csv"
 VENTA_FN = DATA_DIR / "venta.csv"
 TIMEZONE = "America/La_Paz"
-URL_FORTALEZA = "https://bancofortaleza.com.bo"
+URL_FORTALEZA = "https://www.bancofortaleza.com.bo/"
 
 
 def normalizar_decimal(texto):
-    """Extrae el valor numérico y lo convierte a formato decimal flotante."""
+    """Extrae el valor numérico en formato flotante."""
     limpio = re.search(r"(\d+[.,]\d+)", str(texto))
     if not limpio:
         raise ValueError(f"No se pudo extraer número de: {texto}")
@@ -26,7 +27,7 @@ def normalizar_decimal(texto):
 
 
 def limpiar_texto(texto):
-    """Elimina tildes y normaliza espacios."""
+    """Elimina tildes y unifica espacios."""
     if not texto:
         return ""
     texto_norm = unicodedata.normalize("NFKD", texto)
@@ -34,62 +35,70 @@ def limpiar_texto(texto):
     return " ".join(plano.split()).lower()
 
 
+def extraer_datos(texto_o_html):
+    """Busca compra y venta en el contenido."""
+    t = limpiar_texto(texto_o_html)
+    
+    # 1. Intento por palabras clave 'compra' y 'venta'
+    compra_m = re.search(r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)", t)
+    venta_m = re.search(r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)", t)
+
+    # 2. Intento por formato de barra de divisas: 'dolar ... compra ... venta'
+    if not compra_m or not venta_m:
+        patron_bloque = re.search(
+            r"dolar.*?compra\s*(\d+[.,]\d+).*?venta\s*(\d+[.,]\d+)",
+            t,
+        )
+        if patron_bloque:
+            return normalizar_decimal(patron_bloque.group(1)), normalizar_decimal(patron_bloque.group(2))
+
+    c = normalizar_decimal(compra_m.group(1)) if compra_m else None
+    v = normalizar_decimal(venta_m.group(1)) if venta_m else None
+    return c, v
+
+
 def consultar_fortaleza():
-    """Abre la página con un navegador real, extrae los datos mediante selectores estables."""
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            locale="es-ES",
-        )
-        page = context.new_page()
+    """Descarga la página emulando navegación interactiva para obtener las cotizaciones."""
+    session = requests.Session()
+    
+    # Cabeceras completas de navegador para evitar contenido recortado
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/128.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "es-BO,es;q=0.9,en;q=0.8",
+        "Sec-Ch-Ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+    }
 
-        # Abre la página principal esperando hasta que termine la carga de red
-        page.goto(URL_FORTALEZA, wait_until="networkidle", timeout=60000)
+    response = session.get(URL_FORTALEZA, headers=headers, timeout=30)
+    response.raise_for_status()
+    response.encoding = response.apparent_encoding or "utf-8"
 
-        # Espera un momento prudencial para la ejecución de las APIs de tipo de cambio
-        page.wait_for_timeout(3000)
+    soup = BeautifulSoup(response.text, "html.parser")
+    compra, venta = extraer_datos(soup.get_text())
 
-        # 1. Validar que la API del banco no haya fallado
-        texto_cuerpo = page.inner_text("body")
-        if "no se pudieron cargar los datos" in limpiar_texto(texto_cuerpo):
-            browser.close()
-            raise RuntimeError("El portal del banco experimenta problemas y no cargó las tasas.")
+    # Si no lo halla en el texto visible, busca en el código HTML y scripts
+    if compra is None or venta is None:
+        compra, venta = extraer_datos(response.text)
 
-        # 2. Extracción precisa por selectores de la estructura de la tabla de tipo de cambio
-        # Buscamos el contenedor principal de Tipo de Cambio para no confundir datos con el pie de página
-        contenedor_tasas = page.locator("text=Tipo de Cambio / >> xpath=../..")
-        
-        if contenedor_tasas.count() == 0:
-            # Selector de respaldo si la estructura visual cambia ligeramente
-            contenedor_tasas = page.locator("h2:has-text('Tipo de Cambio') + div, div:has-text('DÓLAR')")
-
-        # Extraemos el bloque de texto específico de la sección de monedas
-        texto_bloque = contenedor_tasas.first.inner_text()
-        browser.close()
-
-    texto_limpio = limpiar_texto(texto_bloque)
-
-    # Buscamos de forma secuencial y limpia los valores numéricos dentro del bloque aislado
-    # Al estar aislados en el bloque de tasas, los primeros decimales corresponden a Compra y Venta
-    valores = re.findall(r"\d+[.,]\d+", texto_limpio)
-
-    if len(valores) < 2:
+    if compra is None or venta is None:
         raise ValueError(
-            f"No se pudieron segmentar los valores de compra/venta en el bloque:\n{texto_limpio}"
+            "No se pudieron encontrar las cifras de compra o venta en la respuesta del Banco Fortaleza."
         )
-
-    # El primer valor numérico tras las etiquetas suele ser Compra y el segundo Venta
-    valor_compra = normalizar_decimal(valores[0])
-    valor_venta = normalizar_decimal(valores[1])
 
     # Fecha y hora exacta en Bolivia
     fecha_hora = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
-    return fecha_hora, valor_compra, valor_venta
+    return fecha_hora, compra, venta
 
 
 def consolidar(fn, fecha_hora, valor):
@@ -106,16 +115,14 @@ def consolidar(fn, fecha_hora, valor):
 
 
 def main():
-    try:
-        fecha_hora, compra, venta = consultar_fortaleza()
-        consolidar(COMPRA_FN, fecha_hora, compra)
-        consolidar(VENTA_FN, fecha_hora, venta)
-        print(
-            f"✅ Banco Fortaleza actualizado con éxito para {fecha_hora}: "
-            f"Compra={compra} Bs, Venta={venta} Bs"
-        )
-    except Exception as e:
-        print(f"❌ Error al ejecutar el scraper: {e}")
+    fecha_hora, compra, venta = consultar_fortaleza()
+
+    consolidar(COMPRA_FN, fecha_hora, compra)
+    consolidar(VENTA_FN, fecha_hora, venta)
+    print(
+        f"Banco Fortaleza actualizado con exito para {fecha_hora}: "
+        f"Compra={compra}, Venta={venta}"
+    )
 
 
 if __name__ == "__main__":
