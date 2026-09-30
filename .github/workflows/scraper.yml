@@ -69,13 +69,13 @@ jobs:
         continue-on-error: true
         run: python bancosol/scraper.py
 
-      - name: Ejecutar scraper de Fortaleza
-        continue-on-error: true
-        run: python fortaleza/scraper.py
+      # - name: Ejecutar scraper de Fortaleza
+      #  continue-on-error: true
+       # run: python fortaleza/scraper.py
 
-      - name: Ejecutar scraper de FIE
-        continue-on-error: true
-        run: python fie/scraper.py
+      #- name: Ejecutar scraper de FIE
+      #  continue-on-error: true
+       # run: python fie/scraper.py
 
       - name: Ejecutar scraper de Banco de la Comunidad
         continue-on-error: true
