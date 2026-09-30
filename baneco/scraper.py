@@ -70,30 +70,32 @@ def consultar_baneco(session):
     valor_compra = normalizar_decimal(patron.group(1))
     valor_venta = normalizar_decimal(patron.group(2))
 
-    fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
-    return fecha_hoy, valor_compra, valor_venta
+    # Guardamos la fecha Y la hora en formato YYYY-MM-DD HH:MM:SS (Hora Bolivia)
+    fecha_hora_actual = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
+    return fecha_hora_actual, valor_compra, valor_venta
 
 
-def consolidar(fn, fecha, valor):
+def consolidar(fn, fecha_hora, valor):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    nuevo_dato = pd.DataFrame([{"timestamp": fecha, "value": valor}])
+    nuevo_dato = pd.DataFrame([{"timestamp": fecha_hora, "value": valor}])
 
     if fn.exists():
         df_existente = pd.read_csv(fn)
         nuevo_dato = pd.concat([df_existente, nuevo_dato])
 
+    # Evitamos filas duplicadas con el mismo timestamp exacto
     nuevo_dato = nuevo_dato.drop_duplicates(subset=["timestamp"], keep="last")
     nuevo_dato.sort_values("timestamp").to_csv(fn, index=False)
 
 
 def main():
     with requests.Session() as session:
-        fecha, compra, venta = consultar_baneco(session)
+        fecha_hora, compra, venta = consultar_baneco(session)
 
-    consolidar(COMPRA_FN, fecha, compra)
-    consolidar(VENTA_FN, fecha, venta)
+    consolidar(COMPRA_FN, fecha_hora, compra)
+    consolidar(VENTA_FN, fecha_hora, venta)
     print(
-        f"Banco Economico actualizado con exito para {fecha}: "
+        f"Banco Economico actualizado con exito para {fecha_hora}: "
         f"Compra={compra}, Venta={venta}"
     )
 
