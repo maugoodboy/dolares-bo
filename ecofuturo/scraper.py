@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scraper de tipo de cambio publicado por Banco Ecofuturo."""
+"""Scraper de tipo de cambio publicado por Banco Ecofuturo con fecha y hora."""
 
 import re
 from datetime import datetime
@@ -55,29 +55,31 @@ def consultar_ecofuturo(session):
     valor_compra = normalizar_decimal(compra_match.group(1)) if compra_match else 6.86
     valor_venta = normalizar_decimal(venta_match.group(1)) if venta_match else 6.96
 
-    fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
-    return fecha_hoy, valor_compra, valor_venta
+    # Aquí registramos tanto la fecha como la hora exacta de Bolivia (Hora:Minuto:Segundo)
+    fecha_hora = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
+    return fecha_hora, valor_compra, valor_venta
 
 
-def consolidar(fn, fecha, valor):
+def consolidar(fn, fecha_hora, valor):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    nuevo_dato = pd.DataFrame([{"timestamp": fecha, "value": valor}])
+    nuevo_dato = pd.DataFrame([{"timestamp": fecha_hora, "value": valor}])
 
     if fn.exists():
         df_existente = pd.read_csv(fn)
         nuevo_dato = pd.concat([df_existente, nuevo_dato])
 
+    # Evita filas duplicadas en caso de ejecutar el script en el mismo segundo exacto
     nuevo_dato = nuevo_dato.drop_duplicates(subset=["timestamp"], keep="last")
     nuevo_dato.sort_values("timestamp").to_csv(fn, index=False)
 
 
 def main():
     with requests.Session() as session:
-        fecha, compra, venta = consultar_ecofuturo(session)
+        fecha_hora, compra, venta = consultar_ecofuturo(session)
 
-    consolidar(COMPRA_FN, fecha, compra)
-    consolidar(VENTA_FN, fecha, venta)
-    print(f"Banco Ecofuturo actualizado con exito para {fecha}: Compra={compra}, Venta={venta}")
+    consolidar(COMPRA_FN, fecha_hora, compra)
+    consolidar(VENTA_FN, fecha_hora, venta)
+    print(f"Banco Ecofuturo actualizado con éxito para {fecha_hora}: Compra={compra}, Venta={venta}")
 
 
 if __name__ == "__main__":
