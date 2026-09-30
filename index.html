@@ -431,7 +431,6 @@
   <script>
     // ==========================================
     // 1. CONFIGURACIÓN DE ENTIDADES, COLORES OFICIALES Y ENLACES
-    // (Excluidos: 'fie' y 'fortaleza')
     // ==========================================
     const entidades = [
       { id: 'oficial', nombre: 'Banco Central de Bolivia (BCB)', color: '#002B49', domain: 'https://www.bcb.gob.bo/', iniciales: 'BCB' },
@@ -555,6 +554,15 @@
       }
     }
 
+    // Función auxiliar para leer los datos del BCB (si venta está vacía, usa compra)
+    async function leerCsvBCB(operacion) {
+      let datos = await leerTodoElCsv(`./oficial/${operacion}.csv`);
+      if (datos.length === 0) {
+        datos = await leerTodoElCsv('./oficial/compra.csv');
+      }
+      return datos;
+    }
+
     function aplicarFiltroRango(datos, rango) {
       if (rango === 0 || !datos.length) return datos;
 
@@ -603,7 +611,6 @@
           leerUltimaFila(`./${banco.id}/compra.csv`),
           leerUltimaFila(`./${banco.id}/venta.csv`)
         ]).then(([compra, venta]) => {
-          // Si es Banco Central (oficial) o Banco Ganadero, forzar guion '—' en compra
           if (banco.id === 'oficial' || banco.id === 'ganadero') {
             document.getElementById(`c-${banco.id}`).textContent = '—';
           } else {
@@ -663,17 +670,21 @@
             x: {
               type: 'time',
               time: {
-                unit: 'day', // Corte por día por defecto
+                unit: 'day',
                 displayFormats: {
                   hour: 'HH:mm',
                   day: 'dd/MM'
                 }
               },
-              grid: { display: false },
+              grid: {
+                display: true,
+                color: 'rgba(0, 0, 0, 0.07)',
+                borderDash: [4, 4]
+              },
               ticks: { font: { size: 10 }, color: '#6b7280' }
             },
             y: {
-              min: 7, // Eje Y inicia en 7 Bs
+              min: 7,
               title: {
                 display: true,
                 text: 'En Bolivianos',
@@ -703,15 +714,23 @@
 
       const bancoId = document.getElementById('select-banco').value;
       const bancoObj = entidades.find(e => e.id === bancoId);
-      const ruta = `./${bancoId}/${opIndividual}.csv`;
-      let datos = await leerTodoElCsv(ruta);
+
+      let datos;
+      if (bancoId === 'oficial') {
+        datos = await leerCsvBCB(opIndividual);
+      } else {
+        const ruta = `./${bancoId}/${opIndividual}.csv`;
+        datos = await leerTodoElCsv(ruta);
+      }
+
       datos = aplicarFiltroRango(datos, rangoIndividual);
 
-      // Si es "Hoy", agrupar marcas de tiempo por hora; de lo contrario, agrupar por día
       chartIndividual.options.scales.x.time.unit = (rangoIndividual === 'hoy') ? 'hour' : 'day';
 
       chartIndividual.data.datasets[0].data = datos;
       chartIndividual.data.datasets[0].borderColor = (bancoObj && bancoObj.color) ? bancoObj.color : '#2563eb';
+      // Si es el Banco Central, se le asigna mayor grosor de línea
+      chartIndividual.data.datasets[0].borderWidth = (bancoId === 'oficial') ? 3.2 : 2.2;
       chartIndividual.update();
     }
 
@@ -746,17 +765,21 @@
             x: {
               type: 'time',
               time: {
-                unit: 'day', // Corte por día por defecto
+                unit: 'day',
                 displayFormats: {
                   hour: 'HH:mm',
                   day: 'dd/MM'
                 }
               },
-              grid: { display: false },
+              grid: {
+                display: true,
+                color: 'rgba(0, 0, 0, 0.07)',
+                borderDash: [4, 4]
+              },
               ticks: { font: { size: 10 }, color: '#6b7280' }
             },
             y: {
-              min: 9, // Eje Y configurado desde 9 Bs para distinguir diferencias
+              min: 9,
               title: {
                 display: true,
                 text: 'En Bolivianos',
@@ -788,20 +811,27 @@
     async function actualizarGraficoComparativo() {
       if (!chartComparativo) return;
 
-      // Si es "Hoy", agrupar marcas de tiempo por hora; de lo contrario, agrupar por día
       chartComparativo.options.scales.x.time.unit = (rangoComparativo === 'hoy') ? 'hour' : 'day';
 
       const promesas = entidades.map(async (entidad) => {
-        const ruta = `./${entidad.id}/${opComparativo}.csv`;
-        let datos = await leerTodoElCsv(ruta);
+        let datos;
+        if (entidad.id === 'oficial') {
+          datos = await leerCsvBCB(opComparativo);
+        } else {
+          const ruta = `./${entidad.id}/${opComparativo}.csv`;
+          datos = await leerTodoElCsv(ruta);
+        }
+
         datos = aplicarFiltroRango(datos, rangoComparativo);
+
+        const esBCB = (entidad.id === 'oficial');
 
         return {
           label: entidad.nombre,
           data: datos,
           borderColor: entidad.color,
           backgroundColor: 'transparent',
-          borderWidth: 1.8,
+          borderWidth: esBCB ? 3.2 : 1.8,
           pointRadius: 0,
           pointHoverRadius: 4,
           tension: 0.1
