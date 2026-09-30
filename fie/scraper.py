@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scraper de tipo de cambio publicado por Banco FIE con registro de hora exacta."""
+"""Scraper de tipo de cambio de Banco FIE con fecha y hora exacta de consulta."""
 
 import re
 import unicodedata
@@ -15,11 +15,16 @@ DATA_DIR = Path(__file__).resolve().parent
 COMPRA_FN = DATA_DIR / "compra.csv"
 VENTA_FN = DATA_DIR / "venta.csv"
 TIMEZONE = "America/La_Paz"
-URL_FIE = "https://www.bancofie.com.bo/"
+
+# URLs de consulta: página principal y página directa de tasas
+URLS_FIE = [
+    "https://www.bancofie.com.bo/",
+    "https://www.bancofie.com.bo/tasas-y-cotizaciones",
+]
 
 
 def quitar_tildes(texto):
-    """Elimina tildes y normaliza caracteres especiales a texto plano."""
+    """Elimina tildes y acentos para facilitar la búsqueda."""
     texto_norm = unicodedata.normalize("NFKD", texto)
     return "".join(c for c in texto_norm if not unicodedata.combining(c))
 
@@ -33,30 +38,33 @@ def normalizar_decimal(texto):
 
 
 def extraer_de_texto(texto):
-    """Busca los valores específicamente con el prefijo dolar."""
+    """Busca compra y venta con patrones flexibles."""
     texto_plano = quitar_tildes(texto).lower()
 
-    # Prioridad 1: Buscar 'dolar compra: XX,XX' y 'dolar venta: XX,XX'
-    match_compra = re.search(
-        r"dolar\s*compra\s*[:\-]?\s*(\d+[.,]\d+)",
-        texto_plano,
-    )
-    match_venta = re.search(
-        r"dolar\s*venta\s*[:\-]?\s*(\d+[.,]\d+)",
-        texto_plano,
-    )
+    # Patrón 1: 'dolar compra: 11,52' y 'dolar venta: 12,02'
+    match_compra = re.search(r"dolar\s*compra\s*[:\-]?\s*(\d+[.,]\d+)", texto_plano)
+    match_venta = re.search(r"dolar\s*venta\s*[:\-]?\s*(\d+[.,]\d+)", texto_plano)
 
-    # Prioridad 2: Buscar en frases como 'compra: 11,52'
+    # Patrón 2: 'compra: 11,52' y 'venta: 12,02'
     if not match_compra:
         match_compra = re.search(
-            r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
-            texto_plano,
+            r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)", texto_plano
         )
     if not match_venta:
         match_venta = re.search(
-            r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
+            r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)", texto_plano
+        )
+
+    # Patrón 3: Captura directa desde la franja 'TIPOS DE CAMBIO'
+    if not match_compra or not match_venta:
+        bloque = re.search(
+            r"tipos?\s+de\s+cambio.*?dolar[^\d]+(\d+[.,]\d+)[^\d]+(\d+[.,]\d+)",
             texto_plano,
         )
+        if bloque:
+            val_compra = normalizar_decimal(bloque.group(1))
+            val_venta = normalizar_decimal(bloque.group(2))
+            return val_compra, val_venta
 
     val_compra = normalizar_decimal(match_compra.group(1)) if match_compra else None
     val_venta = normalizar_decimal(match_venta.group(1)) if match_venta else None
@@ -64,57 +72,60 @@ def extraer_de_texto(texto):
 
 
 def consultar_fie(session):
-    """Descarga la página web y obtiene las cotizaciones de Banco FIE con fecha y hora."""
+    """Prueba las fuentes disponibles y extrae compra, venta y hora de consulta."""
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/124.0.0.0 Safari/537.36"
         ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "es-ES,es;q=0.9",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
+        "Referer": "https://www.google.com/",
     }
 
-    response = session.get(URL_FIE, headers=headers, timeout=30)
-    response.raise_for_status()
-    response.encoding = response.apparent_encoding or "utf-8"
+    compra, venta = None, None
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    for url in URLS_FIE:
+        try:
+            response = session.get(url, headers=headers, timeout=25)
+            if response.status_code != 200:
+                continue
 
-    # Extraer texto eliminando elementos que distorsionan la lectura
-    for elemento in soup(["script", "style", "noscript"]):
-        elemento.decompose()
+            response.encoding = response.apparent_encoding or "utf-8"
+            soup = BeautifulSoup(response.text, "html.parser")
 
-    texto_limpio = " ".join(soup.get_text(" ", strip=True).split())
+            for tag in soup(["script", "style", "noscript"]):
+                tag.decompose()
 
-    # Intento 1: Buscar en el texto renderizado
-    compra, venta = extraer_de_texto(texto_limpio)
+            texto_limpio = " ".join(soup.get_text(" ", strip=True).split())
+            compra, venta = extraer_de_texto(texto_limpio)
 
-    # Intento 2: Buscar en el código fuente HTML original
+            if compra is not None and venta is not None:
+                break
+
+            # Búsqueda en el HTML crudo si no estuvo en el texto
+            compra_html, venta_html = extraer_de_texto(response.text)
+            if compra_html and venta_html:
+                compra, venta = compra_html, venta_html
+                break
+        except Exception:
+            continue
+
     if compra is None or venta is None:
-        compra_html, venta_html = extraer_de_texto(response.text)
-        compra = compra or compra_html
-        venta = venta or venta_html
-
-    if compra is None or venta is None:
-        print("[DEBUG] No se encontró el patrón de compra/venta.")
-        print(f"[DEBUG] Longitud de texto descargado: {len(texto_limpio)}")
-        print(f"[DEBUG] Muestra del texto (primeros 500 caracteres): {texto_limpio[:500]}")
         raise ValueError(
-            "No se pudieron encontrar las cotizaciones de compra o venta en la página de Banco FIE."
+            "No se pudieron encontrar las cotizaciones de compra o venta en Banco FIE."
         )
 
-    # Registro de fecha Y hora exacta (Ejemplo: 2026-09-30 11:08:52)
-    timestamp_ahora = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
-    return timestamp_ahora, compra, venta
+    # Recupera fecha y hora de la consulta (ejemplo: 2026-09-30 11:30:00)
+    hora_consulta = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
+    return hora_consulta, compra, venta
 
 
-def consolidar(fn, fecha_hora, valor):
-    """Guarda o actualiza el archivo CSV con fecha y hora sin duplicados."""
+def consolidar(fn, timestamp, valor):
+    """Guarda el valor en el CSV con su fecha y hora exacta."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    nuevo_dato = pd.DataFrame([{"timestamp": fecha_hora, "value": valor}])
+    nuevo_dato = pd.DataFrame([{"timestamp": timestamp, "value": valor}])
 
     if fn.exists():
         df_existente = pd.read_csv(fn)
@@ -126,11 +137,13 @@ def consolidar(fn, fecha_hora, valor):
 
 def main():
     with requests.Session() as session:
-        fecha_hora, compra, venta = consultar_fie(session)
+        hora_consulta, compra, venta = consultar_fie(session)
 
-    consolidar(COMPRA_FN, fecha_hora, compra)
-    consolidar(VENTA_FN, fecha_hora, venta)
-    print(f"Banco FIE actualizado con exito para {fecha_hora}: Compra={compra}, Venta={venta}")
+    consolidar(COMPRA_FN, hora_consulta, compra)
+    consolidar(VENTA_FN, hora_consulta, venta)
+    print(
+        f"Banco FIE actualizado con exito para {hora_consulta}: Compra={compra}, Venta={venta}"
+    )
 
 
 if __name__ == "__main__":
