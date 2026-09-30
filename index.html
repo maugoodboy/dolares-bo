@@ -132,6 +132,10 @@
       text-align: right;
     }
 
+    th.center, td.center {
+      text-align: center;
+    }
+
     tbody tr {
       border-bottom: 1px solid var(--border-color);
       transition: background-color 0.15s ease;
@@ -148,6 +152,39 @@
     td {
       padding: 12px 14px;
       font-size: 0.92rem;
+    }
+
+    /* Columna de Logo */
+    .col-logo {
+      width: 48px;
+      text-align: center;
+      padding-right: 4px;
+    }
+
+    .entity-logo {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      object-fit: contain;
+      vertical-align: middle;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+      background-color: #ffffff;
+      padding: 2px;
+      border: 1px solid var(--border-color);
+    }
+
+    .entity-logo-fallback {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
     }
 
     .bank-name {
@@ -287,6 +324,7 @@
         <table>
           <thead>
             <tr>
+              <th class="center" style="width: 48px;">Logo</th>
               <th>Entidad</th>
               <th class="num">Compra</th>
               <th class="num">Venta</th>
@@ -380,23 +418,23 @@
 
   <script>
     // ==========================================
-    // 1. CONFIGURACIÓN DE ENTIDADES Y PALETA DE COLORES
+    // 1. CONFIGURACIÓN DE ENTIDADES, COLORES Y LOGOS
     // (Excluidos: 'fie' y 'fortaleza')
     // ==========================================
     const entidades = [
-      { id: 'oficial', nombre: 'Banco Central de Bolivia (BCB)', color: '#111827' },
-      { id: 'banco_union', nombre: 'Banco Unión', color: '#0f0bf5' },
-      { id: 'bnb', nombre: 'BNB', color: '#0bf580' },
-      { id: 'bmsc', nombre: 'Banco Mercantil Santa Cruz', color: '#5df50b' },
-      { id: 'bisa', nombre: 'Banco BISA', color: '#f5e10b' },
-      { id: 'ganadero', nombre: 'Banco Ganadero', color: '#abf50b' },
-      { id: 'bancosol', nombre: 'Banco Sol', color: '#ab0bf5' },
-      { id: 'ecofuturo', nombre: 'Banco Ecofuturo', color: '#f57c0b' },
-      { id: 'baneco', nombre: 'Banco Económico', color: '#f50b0b' },
-      { id: 'bco', nombre: 'Banco de la Comunidad', color: '#0b8cf5' },
-      { id: 'bcp', nombre: 'Banco de Crédito Bolivia (BCP)', color: '#1b0bf5' },
-      { id: 'prodem', nombre: 'Banco Prodem', color: '#0b78f5' },
-      { id: 'binance', nombre: 'Binance (USDT-P2P)', color: '#f59e0b' }
+      { id: 'oficial', nombre: 'Banco Central de Bolivia (BCB)', color: '#111827', domain: 'bcb.gob.bo', iniciales: 'BCB' },
+      { id: 'banco_union', nombre: 'Banco Unión', color: '#0f0bf5', domain: 'bancounion.com.bo', iniciales: 'BU' },
+      { id: 'bnb', nombre: 'BNB', color: '#0bf580', domain: 'bnb.com.bo', iniciales: 'BNB' },
+      { id: 'bmsc', nombre: 'Banco Mercantil Santa Cruz', color: '#5df50b', domain: 'bmsc.com.bo', iniciales: 'MSC' },
+      { id: 'bisa', nombre: 'Banco BISA', color: '#f5e10b', domain: 'bisa.com', iniciales: 'BIS' },
+      { id: 'ganadero', nombre: 'Banco Ganadero', color: '#abf50b', domain: 'bg.com.bo', iniciales: 'BG' },
+      { id: 'bancosol', nombre: 'Banco Sol', color: '#ab0bf5', domain: 'bancosol.com.bo', iniciales: 'SOL' },
+      { id: 'ecofuturo', nombre: 'Banco Ecofuturo', color: '#f57c0b', domain: 'bancoecofuturo.com.bo', iniciales: 'ECO' },
+      { id: 'baneco', nombre: 'Banco Económico', color: '#f50b0b', domain: 'baneco.com.bo', iniciales: 'BEC' },
+      { id: 'bco', nombre: 'Banco de la Comunidad', color: '#0b8cf5', domain: 'bancocomunidad.com.bo', iniciales: 'BCO' },
+      { id: 'bcp', nombre: 'Banco de Crédito Bolivia (BCP)', color: '#1b0bf5', domain: 'bcp.com.bo', iniciales: 'BCP' },
+      { id: 'prodem', nombre: 'Banco Prodem', color: '#0b78f5', domain: 'prodem.bo', iniciales: 'PRD' },
+      { id: 'binance', nombre: 'Binance (USDT-P2P)', color: '#f59e0b', domain: 'binance.com', iniciales: 'BIN' }
     ];
 
     // Variables de estado
@@ -521,16 +559,24 @@
     }
 
     // ==========================================
-    // 4. CARGA DE TABLA DIARIA
+    // 4. CARGA DE TABLA DIARIA CON LOGOS
     // ==========================================
     async function cargarTabla() {
       const cuerpo = document.getElementById('cotizaciones-cuerpo');
       cuerpo.innerHTML = '';
 
       for (const banco of entidades) {
+        const logoUrl = `https://www.google.com/s2/favicons?domain=${banco.domain}&sz=64`;
         const fila = document.createElement('tr');
         fila.id = `fila-${banco.id}`;
         fila.innerHTML = `
+          <td class="col-logo">
+            <img src="${logoUrl}" alt="${banco.nombre}" class="entity-logo"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+            <span class="entity-logo-fallback" style="display: none; background-color: ${banco.color};">
+              ${banco.iniciales}
+            </span>
+          </td>
           <td class="bank-name">${banco.nombre}</td>
           <td class="num rate" id="c-${banco.id}">...</td>
           <td class="num rate" id="v-${banco.id}">...</td>
@@ -543,7 +589,7 @@
           leerUltimaFila(`./${banco.id}/compra.csv`),
           leerUltimaFila(`./${banco.id}/venta.csv`)
         ]).then(([compra, venta]) => {
-          // Si es Banco Central (oficial) o Banco Ganadero, forzar guion '-' en compra
+          // Si es Banco Central (oficial) o Banco Ganadero, forzar guion '—' en compra
           if (banco.id === 'oficial' || banco.id === 'ganadero') {
             document.getElementById(`c-${banco.id}`).textContent = '—';
           } else {
