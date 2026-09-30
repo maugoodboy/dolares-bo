@@ -55,8 +55,9 @@ def consultar_bnb(session):
     valor_compra = normalizar_decimal(compra_match.group(1)) if compra_match else 6.86
     valor_venta = normalizar_decimal(venta_match.group(1)) if venta_match else 6.96
 
-    fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
-    return fecha_hoy, valor_compra, valor_venta
+# Registra fecha y hora exacta (ejemplo: 2024-05-15 15:30:00)
+    fecha_hora_actual = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
+    return fecha_hora_actual, valor_compra, valor_venta
 
 
 def consolidar(fn, fecha, valor):
