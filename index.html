@@ -365,7 +365,6 @@
           </div>
 
           <div class="btn-group">
-            <button class="btn-rango-ind" onclick="setRangoInd('hoy', this)">Hoy</button>
             <button class="btn-rango-ind" onclick="setRangoInd(3, this)">3D</button>
             <button class="btn-rango-ind" onclick="setRangoInd(7, this)">7D</button>
             <button class="btn-rango-ind" onclick="setRangoInd(30, this)">1M</button>
@@ -388,7 +387,6 @@
         </div>
 
         <div class="btn-group">
-          <button class="btn-rango-comp" onclick="setRangoComp('hoy', this)">Hoy</button>
           <button class="btn-rango-comp" onclick="setRangoComp(3, this)">3D</button>
           <button class="btn-rango-comp" onclick="setRangoComp(7, this)">7D</button>
           <button class="btn-rango-comp" onclick="setRangoComp(30, this)">1M</button>
@@ -406,7 +404,7 @@
       <div class="methodology-card">
         <h2>Metodología de Extracción y Estimación</h2>
         <p>
-          Este observatorio monitorea continuamente (actualizada dos veces al día) las variaciones del dólar estadounidense (USD) en Bolivia en sus distintas modalidades: el tipo de cambio oficial, el sistema bancario comercial y el mercado digital entre pares (BINANCE P2P USDT).
+          Este observatorio monitorea continuamente (actualizada cada hora) las variaciones del dólar estadounidense (USD) en Bolivia en sus distintas modalidades: el tipo de cambio oficial, el sistema bancario comercial y el mercado digital entre pares (BINANCE P2P USDT).
         </p>
 
         <h3>1. Fuentes de Información</h3>
@@ -418,7 +416,7 @@
 
         <h3>2. Frecuencia y Almacenamiento</h3>
         <p>
-          La recopilación se ejecuta automáticamente a las 7:00 am y 12:00 pm. Cada consulta se procesa e inserta de forma secuencial en archivos históricos dentro del repositorio.
+          La recopilación se ejecuta automáticamente cada hora. Cada consulta se procesa e inserta de forma secuencial en archivos históricos dentro del repositorio.
         </p>
       </div>
     </section>
@@ -554,17 +552,18 @@
       }
     }
 
+    // Para el BCB se lee siempre compra.csv sin importar si se consulta compra o venta
+    async function leerCsvBCB() {
+      let datos = await leerTodoElCsv('./oficial/compra.csv');
+      return datos;
+    }
+
     function aplicarFiltroRango(datos, rango) {
       if (rango === 0 || !datos.length) return datos;
 
       const ahora = new Date();
       let limite = new Date();
-
-      if (rango === 'hoy') {
-        limite.setHours(0, 0, 0, 0);
-      } else {
-        limite.setDate(ahora.getDate() - rango);
-      }
+      limite.setDate(ahora.getDate() - rango);
 
       return datos.filter(d => d.x >= limite);
     }
@@ -663,7 +662,6 @@
               time: {
                 unit: 'day',
                 displayFormats: {
-                  hour: 'HH:mm',
                   day: 'dd/MM'
                 }
               },
@@ -675,7 +673,7 @@
               ticks: { font: { size: 10 }, color: '#6b7280' }
             },
             y: {
-              min: 6,
+              min: 6, // Permite ver siempre la línea del BCB
               title: {
                 display: true,
                 text: 'En Bolivianos',
@@ -706,15 +704,15 @@
       const bancoId = document.getElementById('select-banco').value;
       const bancoObj = entidades.find(e => e.id === bancoId);
 
-      // Si es el BCB, siempre se consulta compra.csv para tener el valor idéntico en compra y venta
-      const ruta = (bancoId === 'oficial')
-        ? './oficial/compra.csv'
-        : `./${bancoId}/${opIndividual}.csv`;
+      let datos;
+      if (bancoId === 'oficial') {
+        datos = await leerCsvBCB();
+      } else {
+        const ruta = `./${bancoId}/${opIndividual}.csv`;
+        datos = await leerTodoElCsv(ruta);
+      }
 
-      let datos = await leerTodoElCsv(ruta);
       datos = aplicarFiltroRango(datos, rangoIndividual);
-
-      chartIndividual.options.scales.x.time.unit = (rangoIndividual === 'hoy') ? 'hour' : 'day';
 
       chartIndividual.data.datasets[0].data = datos;
       chartIndividual.data.datasets[0].borderColor = (bancoObj && bancoObj.color) ? bancoObj.color : '#2563eb';
@@ -755,7 +753,6 @@
               time: {
                 unit: 'day',
                 displayFormats: {
-                  hour: 'HH:mm',
                   day: 'dd/MM'
                 }
               },
@@ -767,7 +764,7 @@
               ticks: { font: { size: 10 }, color: '#6b7280' }
             },
             y: {
-              min: 6, // Eje Y configurado desde 6 Bs para mostrar siempre el BCB
+              min: 6, // Permite ver siempre la línea del BCB
               title: {
                 display: true,
                 text: 'En Bolivianos',
@@ -799,15 +796,15 @@
     async function actualizarGraficoComparativo() {
       if (!chartComparativo) return;
 
-      chartComparativo.options.scales.x.time.unit = (rangoComparativo === 'hoy') ? 'hour' : 'day';
-
       const promesas = entidades.map(async (entidad) => {
-        // Para el BCB se lee siempre compra.csv sin importar si se consulta compra o venta
-        const ruta = (entidad.id === 'oficial')
-          ? './oficial/compra.csv'
-          : `./${entidad.id}/${opComparativo}.csv`;
+        let datos;
+        if (entidad.id === 'oficial') {
+          datos = await leerCsvBCB();
+        } else {
+          const ruta = `./${entidad.id}/${opComparativo}.csv`;
+          datos = await leerTodoElCsv(ruta);
+        }
 
-        let datos = await leerTodoElCsv(ruta);
         datos = aplicarFiltroRango(datos, rangoComparativo);
 
         const esBCB = (entidad.id === 'oficial');
