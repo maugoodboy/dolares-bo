@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """Scraper de tipo de cambio oficial publicado por Banco Unión."""
 
@@ -55,7 +54,6 @@ def consultar_banco_union(session):
     )
 
     if not compra_match or not venta_match:
-        # Intento de rescate si el formato viene junto en una sola frase
         rescate = re.search(
             r"compra\s*bob:\s*(\d+[.,]\d+)\s*/\s*venta\s*(\d+[.,]\d+)",
             texto_completo,
@@ -70,29 +68,31 @@ def consultar_banco_union(session):
         valor_compra = normalizar_decimal(compra_match.group(1))
         valor_venta = normalizar_decimal(venta_match.group(1))
 
-    fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
-    return fecha_hoy, valor_compra, valor_venta
+    # Registra fecha y hora exacta (ejemplo: 2024-05-15 15:30:00)
+    fecha_hora_actual = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
+    return fecha_hora_actual, valor_compra, valor_venta
 
 
-def consolidar(fn, fecha, valor):
+def consolidar(fn, fecha_hora, valor):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    nuevo_dato = pd.DataFrame([{"timestamp": fecha, "value": valor}])
+    nuevo_dato = pd.DataFrame([{"timestamp": fecha_hora, "value": valor}])
 
     if fn.exists():
         df_existente = pd.read_csv(fn)
         nuevo_dato = pd.concat([df_existente, nuevo_dato])
 
+    # Evita filas duplicadas con el mismo timestamp exacto
     nuevo_dato = nuevo_dato.drop_duplicates(subset=["timestamp"], keep="last")
     nuevo_dato.sort_values("timestamp").to_csv(fn, index=False)
 
 
 def main():
     with requests.Session() as session:
-        fecha, compra, venta = consultar_banco_union(session)
+        fecha_hora, compra, venta = consultar_banco_union(session)
 
-    consolidar(COMPRA_FN, fecha, compra)
-    consolidar(VENTA_FN, fecha, venta)
-    print(f"Banco Union actualizado con éxito para {fecha}: Compra={compra}, Venta={venta}")
+    consolidar(COMPRA_FN, fecha_hora, compra)
+    consolidar(VENTA_FN, fecha_hora, venta)
+    print(f"Banco Union actualizado con éxito para {fecha_hora}: Compra={compra}, Venta={venta}")
 
 
 if __name__ == "__main__":
