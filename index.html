@@ -361,7 +361,7 @@
 
         <h3>1. Fuentes de Información</h3>
         <ul>
-          <li><strong>Banco Central de Bolivia (BCB):</strong> Se extrae el tipo de cambio oficial regulado (6.86 compra / 6.96 venta).</li>
+          <li><strong>Banco Central de Bolivia (BCB):</strong> Se extrae el tipo de cambio regulado oficial.</li>
           <li><strong>Banca Múltiple:</strong> Cotizaciones oficiales publicadas por cada entidad bancaria regulada por la ASFI.</li>
           <li><strong>Binance P2P (USDT):</strong> Datos extraídos del mercado digital P2P en Bolivia, tomando como referencia el valor mediano de las órdenes con disponibilidad inmediata.</li>
         </ul>
@@ -543,7 +543,13 @@
           leerUltimaFila(`./${banco.id}/compra.csv`),
           leerUltimaFila(`./${banco.id}/venta.csv`)
         ]).then(([compra, venta]) => {
-          document.getElementById(`c-${banco.id}`).textContent = compra.valor !== '-' ? compra.valor : '—';
+          // Si es Banco Central (oficial) o Banco Ganadero, forzar guion '-' en compra
+          if (banco.id === 'oficial' || banco.id === 'ganadero') {
+            document.getElementById(`c-${banco.id}`).textContent = '—';
+          } else {
+            document.getElementById(`c-${banco.id}`).textContent = compra.valor !== '-' ? compra.valor : '—';
+          }
+
           document.getElementById(`v-${banco.id}`).textContent = venta.valor !== '-' ? venta.valor : '—';
 
           const fechaFinal = venta.fecha !== '—' ? venta.fecha : compra.fecha;
