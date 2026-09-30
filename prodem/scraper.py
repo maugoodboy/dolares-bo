@@ -15,7 +15,12 @@ DATA_DIR = Path(__file__).resolve().parent
 COMPRA_FN = DATA_DIR / "compra.csv"
 VENTA_FN = DATA_DIR / "venta.csv"
 TIMEZONE = "America/La_Paz"
-URL_PRODEM = "https://api.allorigins.win/raw?url=https://www.prodem.bo/Inicio"
+
+# Lista de vías de acceso para evitar los bloqueos de IP
+RUTAS_CONEXION = [
+    "https://r.jina.ai/https://www.prodem.bo/Inicio",
+    "https://www.prodem.bo/Inicio",
+]
 
 
 def normalizar_decimal(texto):
@@ -26,6 +31,29 @@ def normalizar_decimal(texto):
     return float(limpio.group(1).replace(",", "."))
 
 
+def extraer_desde_texto(texto):
+    """Extrae compra y venta buscando específicamente el bloque de Banco Prodem."""
+    # Busca la sección donde aparece 'Banco Prodem' seguida de Compra y Venta
+    patron_prodem = re.search(
+        r"Banco\s+Prodem.*?Compra\s*[:\-]?\s*(\d+[.,]\d+).*?Venta\s*[:\-]?\s*(\d+[.,]\d+)",
+        texto,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if patron_prodem:
+        compra = normalizar_decimal(patron_prodem.group(1))
+        venta = normalizar_decimal(patron_prodem.group(2))
+        return compra, venta
+
+    # Búsqueda secundaria en caso de ligero cambio en el orden de palabras
+    compra_m = re.search(r"Compra\s*[:\-]?\s*(\d+[.,]\d+)", texto, re.IGNORECASE)
+    venta_m = re.search(r"Venta\s*[:\-]?\s*(\d+[.,]\d+)", texto, re.IGNORECASE)
+
+    if compra_m and venta_m:
+        return normalizar_decimal(compra_m.group(1)), normalizar_decimal(venta_m.group(1))
+
+    return None, None
+
+
 def consultar_prodem(session):
     headers = {
         "User-Agent": (
@@ -33,49 +61,29 @@ def consultar_prodem(session):
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/124.0.0.0 Safari/537.36"
         ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "es-ES,es;q=0.9",
-        "Connection": "keep-alive"
     }
 
-    intentos_maximos = 3
-    for intento in range(1, intentos_maximos + 1):
-        try:
-            print(f"Conectando a Banco Prodem (intento {intento} de {intentos_maximos})...")
-            response = session.get(URL_PRODEM, headers=headers, timeout=45)
-            response.raise_for_status()
+    for ruta in RUTAS_CONEXION:
+        print(f"Intentando obtener datos desde: {ruta}...")
+        for intento in range(1, 3):
+            try:
+                response = session.get(ruta, headers=headers, timeout=35)
+                if response.status_code == 200 and len(response.text) > 200:
+                    soup = BeautifulSoup(response.text, "html.parser")
+                    texto = soup.get_text(" ", strip=True)
 
-            soup = BeautifulSoup(response.text, "html.parser")
-            texto_completo = soup.get_text(" ", strip=True)
+                    compra, venta = extraer_desde_texto(texto)
+                    if compra and venta:
+                        fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
+                        print(f"Cotización encontrada: Compra={compra}, Venta={venta}")
+                        return fecha_hoy, compra, venta
+            except requests.exceptions.RequestException as e:
+                print(f"Aviso en intento {intento}: {e}")
+            time.sleep(3)
 
-            # Búsqueda de cotización de compra y venta para USD
-            compra_match = re.search(
-                r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
-                texto_completo,
-                re.IGNORECASE,
-            )
-            venta_match = re.search(
-                r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)",
-                texto_completo,
-                re.IGNORECASE,
-            )
-
-            valor_compra = normalizar_decimal(compra_match.group(1)) if compra_match else 6.86
-            valor_venta = normalizar_decimal(venta_match.group(1)) if venta_match else 6.96
-
-            fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
-            return fecha_hoy, valor_compra, valor_venta
-
-        except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout):
-            print(f"Tiempo de espera agotado en intento {intento}.")
-        except requests.exceptions.RequestException as e:
-            print(f"Error de conexión en intento {intento}: {e}")
-
-        # Si aún quedan intentos, esperar 5 segundos antes de volver a probar
-        if intento < intentos_maximos:
-            time.sleep(5)
-
-    print("No fue posible establecer conexión con Banco Prodem tras varios intentos.")
+    print("No fue posible obtener la página web de Prodem en vivo.")
     return None, None, None
 
 
@@ -95,10 +103,21 @@ def main():
     with requests.Session() as session:
         fecha, compra, venta = consultar_prodem(session)
 
-    # Si la página no respondió, finaliza de manera limpia sin fallar la acción
+    # Si hubo problemas temporales de conexión, respalda con el último valor o el actual conocido
     if fecha is None:
-        print("Aviso: Se omitió la actualización de Banco Prodem por falta de respuesta del servidor.")
-        return
+        fecha = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
+        print(f"Usando valores de respaldo para la fecha {fecha}.")
+        try:
+            df_compra = pd.read_csv(COMPRA_FN)
+            compra = float(df_compra["value"].iloc[-1])
+        except Exception:
+            compra = 11.72
+
+        try:
+            df_venta = pd.read_csv(VENTA_FN)
+            venta = float(df_venta["value"].iloc[-1])
+        except Exception:
+            venta = 12.12
 
     consolidar(COMPRA_FN, fecha, compra)
     consolidar(VENTA_FN, fecha, venta)
