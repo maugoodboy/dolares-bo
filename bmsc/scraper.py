@@ -109,8 +109,9 @@ def consultar_bmsc(session):
         valor_compra = 10.77
         valor_venta = 12.32
 
-    fecha_hoy = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d")
-    return fecha_hoy, valor_compra, valor_venta
+# Registra fecha y hora exacta (ejemplo: 2024-05-15 15:30:00)
+    fecha_hora_actual = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
+    return fecha_hora_actual, valor_compra, valor_venta
 
 
 def consolidar(fn, fecha, valor):
