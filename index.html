@@ -554,15 +554,6 @@
       }
     }
 
-    // Función auxiliar para leer los datos del BCB (si venta está vacía, usa compra)
-    async function leerCsvBCB(operacion) {
-      let datos = await leerTodoElCsv(`./oficial/${operacion}.csv`);
-      if (datos.length === 0) {
-        datos = await leerTodoElCsv('./oficial/compra.csv');
-      }
-      return datos;
-    }
-
     function aplicarFiltroRango(datos, rango) {
       if (rango === 0 || !datos.length) return datos;
 
@@ -684,7 +675,7 @@
               ticks: { font: { size: 10 }, color: '#6b7280' }
             },
             y: {
-              min: 7,
+              min: 6,
               title: {
                 display: true,
                 text: 'En Bolivianos',
@@ -715,21 +706,18 @@
       const bancoId = document.getElementById('select-banco').value;
       const bancoObj = entidades.find(e => e.id === bancoId);
 
-      let datos;
-      if (bancoId === 'oficial') {
-        datos = await leerCsvBCB(opIndividual);
-      } else {
-        const ruta = `./${bancoId}/${opIndividual}.csv`;
-        datos = await leerTodoElCsv(ruta);
-      }
+      // Si es el BCB, siempre se consulta compra.csv para tener el valor idéntico en compra y venta
+      const ruta = (bancoId === 'oficial')
+        ? './oficial/compra.csv'
+        : `./${bancoId}/${opIndividual}.csv`;
 
+      let datos = await leerTodoElCsv(ruta);
       datos = aplicarFiltroRango(datos, rangoIndividual);
 
       chartIndividual.options.scales.x.time.unit = (rangoIndividual === 'hoy') ? 'hour' : 'day';
 
       chartIndividual.data.datasets[0].data = datos;
       chartIndividual.data.datasets[0].borderColor = (bancoObj && bancoObj.color) ? bancoObj.color : '#2563eb';
-      // Si es el Banco Central, se le asigna mayor grosor de línea
       chartIndividual.data.datasets[0].borderWidth = (bancoId === 'oficial') ? 3.2 : 2.2;
       chartIndividual.update();
     }
@@ -779,7 +767,7 @@
               ticks: { font: { size: 10 }, color: '#6b7280' }
             },
             y: {
-              min: 9,
+              min: 6, // Eje Y configurado desde 6 Bs para mostrar siempre el BCB
               title: {
                 display: true,
                 text: 'En Bolivianos',
@@ -814,14 +802,12 @@
       chartComparativo.options.scales.x.time.unit = (rangoComparativo === 'hoy') ? 'hour' : 'day';
 
       const promesas = entidades.map(async (entidad) => {
-        let datos;
-        if (entidad.id === 'oficial') {
-          datos = await leerCsvBCB(opComparativo);
-        } else {
-          const ruta = `./${entidad.id}/${opComparativo}.csv`;
-          datos = await leerTodoElCsv(ruta);
-        }
+        // Para el BCB se lee siempre compra.csv sin importar si se consulta compra o venta
+        const ruta = (entidad.id === 'oficial')
+          ? './oficial/compra.csv'
+          : `./${entidad.id}/${opComparativo}.csv`;
 
+        let datos = await leerTodoElCsv(ruta);
         datos = aplicarFiltroRango(datos, rangoComparativo);
 
         const esBCB = (entidad.id === 'oficial');
