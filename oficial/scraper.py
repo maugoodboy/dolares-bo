@@ -16,7 +16,11 @@ LANDING_SELECTORS = {
     "tco_duo_num": ".bcb-tco-duo-num",
     "tco_duo_fecha": ".bcb-tco-duo-label span",
 }
+
+# 1. Definimos los nombres de ambos archivos
 COMPRA_FN = "compra.csv"
+VENTA_FN = "venta.csv"
+
 DATA_DIR = Path(__file__).resolve().parent
 
 
@@ -63,21 +67,35 @@ def consultar_landing(session):
     return fecha_iso(fecha), normalizar_decimal(tco.get_text(strip=True))
 
 
-def consolidar(compra):
+# 2. Ajustamos la función para que reciba el nombre del archivo destino
+def consolidar(datos_nuevos, nombre_archivo):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    fn = DATA_DIR / COMPRA_FN
+    fn = DATA_DIR / nombre_archivo
+    
+    # Si el archivo ya existe en tu carpeta, leemos los datos anteriores y agregamos el nuevo
     if fn.exists():
-        compra = pd.concat([pd.read_csv(fn), compra])
-    compra = compra.drop_duplicates(subset=["timestamp"], keep="last")
-    compra["value"] = compra["value"].round(5)
-    compra.sort_values("timestamp").to_csv(fn, index=False)
+        df = pd.concat([pd.read_csv(fn), datos_nuevos])
+    else:
+        df = datos_nuevos.copy()
+        
+    # Eliminamos duplicados por fecha conservando el último registro
+    df = df.drop_duplicates(subset=["timestamp"], keep="last")
+    df["value"] = df["value"].round(5)
+    df.sort_values("timestamp").to_csv(fn, index=False)
 
 
 def main():
     with requests.Session() as session:
         timestamp, tco = consultar_landing(session)
-    consolidar(pd.DataFrame([{"timestamp": timestamp, "value": tco}]))
-    print(f"TCO oficial actualizado para {timestamp}: {tco}")
+    
+    # Preparamos la fila con la fecha y el valor obtenido
+    nuevo_registro = pd.DataFrame([{"timestamp": timestamp, "value": tco}])
+    
+    # 3. Guardamos la misma fila en ambos archivos
+    consolidar(nuevo_registro, COMPRA_FN)
+    consolidar(nuevo_registro, VENTA_FN)
+    
+    print(f"TCO oficial actualizado para {timestamp}: {tco} (guardado en compra.csv y venta.csv)")
 
 
 if __name__ == "__main__":
