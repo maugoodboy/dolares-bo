@@ -1,12 +1,12 @@
 // ==========================================
-// 1. CONFIGURACIÓN DE ENTIDADES Y COLORES
+// 1. CONFIGURACIÓN DE ENTIDADES
 // ==========================================
 const entidades = [
   { id: 'oficial', nombre: 'Banco Central de Bolivia (BCB)', color: '#002B49', domain: 'https://www.bcb.gob.bo/', iniciales: 'BCB' },
   { id: 'banco_union', nombre: 'Banco Unión', color: '#003A70', domain: 'https://www.bancounion.com.bo', iniciales: 'BU' },
   { id: 'bnb', nombre: 'Banco Nacional de Bolivia (BNB)', color: '#00853F', domain: 'https://www.bnb.com.bo/PortalBNB/Principal/BancaPersonas', iniciales: 'BNB' },
   { id: 'bmsc', nombre: 'Banco Mercantil Santa Cruz (BMSC)', color: '#F37021', domain: 'https://www.bmsc.com.bo/', iniciales: 'BMSC' },
-  { id: 'bisa', nombre: 'Banco BISA', color: '#FFD100', domain: 'https://www.bisa.com/home', iniciales: 'BIS' },
+  { id: 'bisa', nombre: 'Banco BISA', color: '#D97706', domain: 'https://www.bisa.com/home', iniciales: 'BIS' },
   { id: 'ganadero', nombre: 'Banco Ganadero', color: '#CC0000', domain: 'https://www.bg.com.bo', iniciales: 'BG' },
   { id: 'bancosol', nombre: 'Banco Sol', color: '#E4007D', domain: 'https://www.bancosol.com.bo', iniciales: 'SOL' },
   { id: 'ecofuturo', nombre: 'Banco Ecofuturo', color: '#689F38', domain: 'https://www.bancoecofuturo.com.bo/', iniciales: 'ECO' },
@@ -19,12 +19,8 @@ const entidades = [
   { id: 'binance', nombre: 'Binance (USDT-P2P)', color: '#F3BA2F', domain: 'https://p2p.binance.com/', iniciales: 'BIN' }
 ];
 
-let chartIndividual = null;
-let chartComparativo = null;
-let opIndividual = 'compra';
-let rangoIndividual = 0;
-let opComparativo = 'compra';
-let rangoComparativo = 0;
+let datosCargados = []; // Memoria de datos obtenidos
+let tipoOperacionLollipop = 'venta';
 
 // ==========================================
 // 2. NAVEGACIÓN ENTRE PESTAÑAS
@@ -36,14 +32,8 @@ function cambiarPagina(idPagina, btn) {
   document.getElementById(`pag-${idPagina}`).classList.add('active');
   btn.classList.add('active');
 
-  if (idPagina === 'historico' && !chartIndividual) {
-    inicializarGraficoIndividual();
-  } else if (idPagina === 'comparativo') {
-    if (!chartComparativo) {
-      inicializarGraficoComparativo();
-    } else {
-      actualizarGraficoComparativo();
-    }
+  if (idPagina === 'lollipop') {
+    renderizarLollipop();
   }
 }
 
@@ -88,50 +78,13 @@ async function leerUltimaFila(rutaCsv) {
   }
 }
 
-async function leerTodoElCsv(rutaCsv) {
-  try {
-    const res = await fetch(rutaCsv + '?t=' + Date.now());
-    if (!res.ok) return [];
-
-    const texto = await res.text();
-    const filas = texto.trim().split('\n').filter(l => l.trim() !== '');
-    if (filas.length <= 1) return [];
-
-    const indiceColumna = rutaCsv.includes('binance') ? 3 : 1;
-    const datos = [];
-
-    for (let i = 1; i < filas.length; i++) {
-      const col = filas[i].split(',');
-      if (col.length > indiceColumna) {
-        const dateObj = new Date(col[0].trim().replace(' ', 'T'));
-        const valorLimpio = col[indiceColumna].trim().replace(',', '.');
-        const valor = parseFloat(valorLimpio);
-        if (!isNaN(dateObj) && !isNaN(valor)) {
-          datos.push({ x: dateObj, y: valor });
-        }
-      }
-    }
-    return datos;
-  } catch (e) {
-    return [];
-  }
-}
-
-function aplicarFiltroRango(datos, rango) {
-  if (rango === 0 || !datos.length) return datos;
-  const limite = new Date();
-  limite.setDate(limite.getDate() - rango);
-  return datos.filter(d => d.x >= limite);
-}
-
 // ==========================================
-// 4. CARGA DE TABLA + DIBUJADO DE GRÁFICO
+// 4. CARGA DE TABLA DE DATOS
 // ==========================================
 async function cargarTabla() {
   const cuerpo = document.getElementById('cotizaciones-cuerpo');
   cuerpo.innerHTML = '';
-
-  const listaParaGrafico = [];
+  datosCargados = [];
 
   const promesas = entidades.map(async (banco) => {
     const logoUrl = `https://www.google.com/s2/favicons?domain=${banco.domain}&sz=128`;
@@ -164,41 +117,64 @@ async function cargarTabla() {
     const elFecha = document.getElementById(`f-${banco.id}`);
     const elHora = document.getElementById(`h-${banco.id}`);
 
+    const valorCompraNum = parseFloat(String(compra.valor).trim().replace(',', '.'));
+    const valorVentaNum = parseFloat(String(venta.valor).trim().replace(',', '.'));
+
     if (banco.id === 'oficial' || banco.id === 'ganadero') {
       elCompra.textContent = '—';
     } else {
-      elCompra.textContent = compra.valor !== '-' ? compra.valor : '—';
+      elCompra.textContent = !isNaN(valorCompraNum) ? valorCompraNum.toFixed(2) : (compra.valor !== '-' ? compra.valor : '—');
     }
 
-    elVenta.textContent = venta.valor !== '-' ? venta.valor : '—';
+    elVenta.textContent = !isNaN(valorVentaNum) ? valorVentaNum.toFixed(2) : (venta.valor !== '-' ? venta.valor : '—');
     elFecha.textContent = venta.fecha !== '—' ? venta.fecha : compra.fecha;
     elHora.textContent = venta.hora !== '—' ? venta.hora : compra.hora;
 
-    // Convertir a número asegurando comas y espacios limpios
-    const valorLimpio = String(venta.valor).trim().replace(',', '.');
-    const valorNumerico = parseFloat(valorLimpio);
-
-    // Omitimos el BCB oficial para este ranking comparativo entre entidades comerciales y digitales
-    if (!isNaN(valorNumerico) && banco.id !== 'oficial') {
-      listaParaGrafico.push({
-        banco,
-        valor: valorNumerico,
-        fecha: venta.fecha !== '—' ? venta.fecha : compra.fecha,
-        logoUrl
-      });
-    }
+    // Guardar para el gráfico Lollipop
+    datosCargados.push({
+      banco,
+      logoUrl,
+      compra: !isNaN(valorCompraNum) && banco.id !== 'ganadero' ? valorCompraNum : null,
+      venta: !isNaN(valorVentaNum) ? valorVentaNum : null,
+      fecha: venta.fecha !== '—' ? venta.fecha : compra.fecha
+    });
   });
 
   await Promise.all(promesas);
-  dibujarGraficoLollipop(listaParaGrafico);
 }
 
-function dibujarGraficoLollipop(items) {
+// ==========================================
+// 5. CONTROL Y RENDERIZADO DEL GRÁFICO LOLLIPOP
+// ==========================================
+function setTipoOperacionLollipop(tipo) {
+  tipoOperacionLollipop = tipo;
+  document.getElementById('btn-lol-compra').classList.toggle('active', tipo === 'compra');
+  document.getElementById('btn-lol-venta').classList.toggle('active', tipo === 'venta');
+  document.getElementById('lollipop-titulo').textContent = `Cotizaciones de ${tipo} por entidad`;
+  renderizarLollipop();
+}
+
+function renderizarLollipop() {
   const contenedor = document.getElementById('lollipop-chart-container');
   const spanFecha = document.getElementById('lollipop-fecha');
-  if (!contenedor || !items.length) return;
+  if (!contenedor) return;
 
   contenedor.innerHTML = '';
+
+  // Filtrar las entidades que tengan un valor válido para el tipo seleccionado (omitir BCB en ranking interactivo)
+  const items = datosCargados
+    .filter(item => item.banco.id !== 'oficial' && item[tipoOperacionLollipop] !== null && !isNaN(item[tipoOperacionLollipop]))
+    .map(item => ({
+      banco: item.banco,
+      logoUrl: item.logoUrl,
+      valor: item[tipoOperacionLollipop],
+      fecha: item.fecha
+    }));
+
+  if (!items.length) {
+    contenedor.innerHTML = '<div class="lollipop-empty">No hay datos disponibles para esta operación.</div>';
+    return;
+  }
 
   // Ordenar de menor a mayor cotización
   items.sort((a, b) => a.valor - b.valor);
@@ -209,191 +185,40 @@ function dibujarGraficoLollipop(items) {
 
   const minVal = items[0].valor;
   const maxVal = items[items.length - 1].valor;
+  const midVal = (minVal + maxVal) / 2;
   const margen = (maxVal - minVal) === 0 ? 1 : (maxVal - minVal);
 
+  // Actualizar indicadores del eje
+  document.getElementById('scale-min').textContent = `${minVal.toFixed(2)} Bs`;
+  document.getElementById('scale-mid').textContent = `${midVal.toFixed(2)} Bs`;
+  document.getElementById('scale-max').textContent = `${maxVal.toFixed(2)} Bs`;
+
   items.forEach(item => {
-    const pct = 10 + ((item.valor - minVal) / margen) * 85;
+    // Cálculo porcentual del punto (entre 6% y 95% para espacio visual del lollipop)
+    const pct = 6 + ((item.valor - minVal) / margen) * 88;
 
     const row = document.createElement('div');
     row.className = 'lollipop-row';
     row.innerHTML = `
-      <div class="lollipop-val">${item.valor.toFixed(2)}</div>
-      <div>
+      <div class="lollipop-val" style="color: ${item.banco.color};">${item.valor.toFixed(2)}</div>
+      <a href="${item.banco.domain}" target="_blank" rel="noopener noreferrer" class="lollipop-logo-wrap" title="Ir a ${item.banco.nombre}">
         <img src="${item.logoUrl}" alt="${item.banco.nombre}" class="lollipop-logo"
              onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
         <span class="lollipop-fallback" style="display:none; background-color:${item.banco.color}">
           ${item.banco.iniciales}
         </span>
-      </div>
-      <div class="lollipop-name" title="${item.banco.nombre}">${item.banco.nombre}</div>
+      </a>
+      <a href="${item.banco.domain}" target="_blank" rel="noopener noreferrer" class="lollipop-name" title="${item.banco.nombre}">
+        ${item.banco.nombre}
+      </a>
       <div class="lollipop-track">
         <div class="lollipop-line" style="width: ${pct}%; background-color: ${item.banco.color};"></div>
-        <div class="lollipop-dot" style="background-color: ${item.banco.color};"></div>
+        <div class="lollipop-dot" style="left: ${pct}%; background-color: ${item.banco.color};" data-info="${item.banco.nombre}: ${item.valor.toFixed(2)} Bs"></div>
       </div>
     `;
     contenedor.appendChild(row);
   });
 }
 
-// ==========================================
-// 5. GRÁFICO INDIVIDUAL
-// ==========================================
-function popularSelectBancos() {
-  const select = document.getElementById('select-banco');
-  select.innerHTML = '';
-  entidades.forEach(e => {
-    const opt = document.createElement('option');
-    opt.value = e.id;
-    opt.textContent = e.nombre;
-    select.appendChild(opt);
-  });
-  select.value = 'binance';
-}
-
-function inicializarGraficoIndividual() {
-  popularSelectBancos();
-  const ctx = document.getElementById('canvasHistorico').getContext('2d');
-
-  chartIndividual = new Chart(ctx, {
-    type: 'line',
-    data: {
-      datasets: [{
-        label: 'Cotización (Bs)',
-        data: [],
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.08)',
-        borderWidth: 2,
-        pointRadius: 0,
-        fill: true,
-        tension: 0.2
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          type: 'time',
-          time: { unit: 'day', displayFormats: { day: 'dd/MM' } },
-          grid: { color: 'rgba(226, 232, 240, 0.6)' }
-        },
-        y: {
-          min: 6,
-          grid: { color: 'rgba(226, 232, 240, 0.6)' },
-          ticks: { font: { family: 'Inter', size: 11 } }
-        }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => ` Bs. ${ctx.parsed.y.toFixed(2)}`
-          }
-        }
-      }
-    }
-  });
-
-  actualizarGraficoIndividual();
-}
-
-async function actualizarGraficoIndividual() {
-  if (!chartIndividual) return;
-  const bancoId = document.getElementById('select-banco').value;
-  const bancoObj = entidades.find(e => e.id === bancoId);
-
-  const ruta = bancoId === 'oficial' ? './oficial/compra.csv' : `./${bancoId}/${opIndividual}.csv`;
-  let datos = await leerTodoElCsv(ruta);
-  datos = aplicarFiltroRango(datos, rangoIndividual);
-
-  chartIndividual.data.datasets[0].data = datos;
-  chartIndividual.data.datasets[0].borderColor = bancoObj ? bancoObj.color : '#2563eb';
-  chartIndividual.update();
-}
-
-function setTipoOperacionInd(tipo) {
-  opIndividual = tipo;
-  document.getElementById('btn-ind-compra').classList.toggle('active', tipo === 'compra');
-  document.getElementById('btn-ind-venta').classList.toggle('active', tipo === 'venta');
-  actualizarGraficoIndividual();
-}
-
-function setRangoInd(rango, btn) {
-  rangoIndividual = rango;
-  document.querySelectorAll('.btn-rango-ind').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  actualizarGraficoIndividual();
-}
-
-// ==========================================
-// 6. GRÁFICO COMPARATIVO
-// ==========================================
-function inicializarGraficoComparativo() {
-  const ctx = document.getElementById('canvasComparativo').getContext('2d');
-
-  chartComparativo = new Chart(ctx, {
-    type: 'line',
-    data: { datasets: [] },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          type: 'time',
-          time: { unit: 'day', displayFormats: { day: 'dd/MM' } },
-          grid: { color: 'rgba(226, 232, 240, 0.6)' }
-        },
-        y: {
-          min: 6,
-          grid: { color: 'rgba(226, 232, 240, 0.6)' },
-          ticks: { font: { family: 'Inter', size: 11 } }
-        }
-      },
-      plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 11 } } }
-      }
-    }
-  });
-
-  actualizarGraficoComparativo();
-}
-
-async function actualizarGraficoComparativo() {
-  if (!chartComparativo) return;
-
-  const promesas = entidades.map(async (entidad) => {
-    const ruta = entidad.id === 'oficial' ? './oficial/compra.csv' : `./${entidad.id}/${opComparativo}.csv`;
-    let datos = await leerTodoElCsv(ruta);
-    datos = aplicarFiltroRango(datos, rangoComparativo);
-
-    return {
-      label: entidad.nombre,
-      data: datos,
-      borderColor: entidad.color,
-      backgroundColor: 'transparent',
-      borderWidth: entidad.id === 'oficial' ? 3 : 1.8,
-      pointRadius: 0,
-      tension: 0.1
-    };
-  });
-
-  chartComparativo.data.datasets = await Promise.all(promesas);
-  chartComparativo.update();
-}
-
-function setTipoOperacionComp(tipo) {
-  opComparativo = tipo;
-  document.getElementById('btn-comp-compra').classList.toggle('active', tipo === 'compra');
-  document.getElementById('btn-comp-venta').classList.toggle('active', tipo === 'venta');
-  actualizarGraficoComparativo();
-}
-
-function setRangoComp(rango, btn) {
-  rangoComparativo = rango;
-  document.querySelectorAll('.btn-rango-comp').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  actualizarGraficoComparativo();
-}
-
-// Iniciar cargando la tabla y el gráfico
+// Inicialización automática
 cargarTabla();
