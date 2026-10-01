@@ -116,13 +116,15 @@ function aplicarFiltroRango(datos, rango) {
 }
 
 // ==========================================
-// 4. CARGA DE TABLA DE COTIZACIONES
+// 4. CARGA DE TABLA + DIBUJADO DE GRÁFICO LOLLIPOP
 // ==========================================
 async function cargarTabla() {
   const cuerpo = document.getElementById('cotizaciones-cuerpo');
   cuerpo.innerHTML = '';
 
-  for (const banco of entidades) {
+  const listaParaGrafico = [];
+
+  const promesas = entidades.map(async (banco) => {
     const logoUrl = `https://www.google.com/s2/favicons?domain=${banco.domain}&sz=128`;
     const fila = document.createElement('tr');
     fila.innerHTML = `
@@ -143,27 +145,83 @@ async function cargarTabla() {
     `;
     cuerpo.appendChild(fila);
 
-    Promise.all([
+    const [compra, venta] = await Promise.all([
       leerUltimaFila(`./${banco.id}/compra.csv`),
       leerUltimaFila(`./${banco.id}/venta.csv`)
-    ]).then(([compra, venta]) => {
-      const elCompra = document.getElementById(`c-${banco.id}`);
-      const elVenta = document.getElementById(`v-${banco.id}`);
-      const elFecha = document.getElementById(`f-${banco.id}`);
-      const elHora = document.getElementById(`h-${banco.id}`);
+    ]);
 
-      // El BCB y Ganadero no suelen tener valor de compra en este formato
-      if (banco.id === 'oficial' || banco.id === 'ganadero') {
-        elCompra.textContent = '—';
-      } else {
-        elCompra.textContent = compra.valor !== '-' ? compra.valor : '—';
-      }
+    const elCompra = document.getElementById(`c-${banco.id}`);
+    const elVenta = document.getElementById(`v-${banco.id}`);
+    const elFecha = document.getElementById(`f-${banco.id}`);
+    const elHora = document.getElementById(`h-${banco.id}`);
 
-      elVenta.textContent = venta.valor !== '-' ? venta.valor : '—';
-      elFecha.textContent = venta.fecha !== '—' ? venta.fecha : compra.fecha;
-      elHora.textContent = venta.hora !== '—' ? venta.hora : compra.hora;
-    });
-  }
+    // El BCB y Ganadero no suelen tener valor de compra en este formato
+    if (banco.id === 'oficial' || banco.id === 'ganadero') {
+      elCompra.textContent = '—';
+    } else {
+      elCompra.textContent = compra.valor !== '-' ? compra.valor : '—';
+    }
+
+    elVenta.textContent = venta.valor !== '-' ? venta.valor : '—';
+    elFecha.textContent = venta.fecha !== '—' ? venta.fecha : compra.fecha;
+    elHora.textContent = venta.hora !== '—' ? venta.hora : compra.hora;
+
+    // Guardar para el gráfico si tiene un número válido de venta
+    const valorNumerico = parseFloat(venta.valor);
+    if (!isNaN(valorNumerico)) {
+      listaParaGrafico.push({
+        banco,
+        valor: valorNumerico,
+        fecha: venta.fecha !== '—' ? venta.fecha : compra.fecha,
+        logoUrl
+      });
+    }
+  });
+
+  await Promise.all(promesas);
+  dibujarGraficoLollipop(listaParaGrafico);
+}
+
+// Función que genera el gráfico con logos, nombres y líneas de colores
+function dibujarGraficoLollipop(items) {
+  const contenedor = document.getElementById('lollipop-chart-container');
+  const spanFecha = document.getElementById('lollipop-fecha');
+  if (!contenedor || !items.length) return;
+
+  contenedor.innerHTML = '';
+
+  // Ordenar de menor a mayor cotización de venta
+  items.sort((a, b) => a.valor - b.valor);
+
+  spanFecha.textContent = items[0].fecha || '';
+
+  const minVal = items[0].valor;
+  const maxVal = items[items.length - 1].valor;
+  const margen = (maxVal - minVal) === 0 ? 1 : (maxVal - minVal);
+
+  items.forEach(item => {
+    // Escalar la longitud de la línea entre 10% y 98%
+    const pct = 10 + ((item.valor - minVal) / margen) * 88;
+
+    const row = document.createElement('div');
+    row.className = 'lollipop-row';
+    row.innerHTML = `
+      <div class="lollipop-val">${item.valor.toFixed(2)}</div>
+      <div>
+        <img src="${item.logoUrl}" alt="${item.banco.nombre}" class="lollipop-logo"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+        <span class="lollipop-fallback" style="display:none; background-color:${item.banco.color}">
+          ${item.banco.iniciales}
+        </span>
+      </div>
+      <div class="lollipop-name" title="${item.banco.nombre}">${item.banco.nombre}</div>
+      <div class="lollipop-track">
+        <div class="lollipop-line" style="width: ${pct}%; background-color: ${item.banco.color};"></div>
+        <div class="lollipop-dot" style="background-color: ${item.banco.color};"></div>
+      </div>
+    `;
+    contenedor.appendChild(row);
+  });
 }
 
 // ==========================================
@@ -326,5 +384,5 @@ function setRangoComp(rango, btn) {
   actualizarGraficoComparativo();
 }
 
-// Iniciar cargando la tabla al abrir la página
+// Iniciar cargando la tabla y el gráfico de barras al abrir la página
 cargarTabla();
