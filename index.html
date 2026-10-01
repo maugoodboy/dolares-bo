@@ -11,11 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Enlace al archivo CSS externo -->
-  <link rel="stylesheet" href="estilos.css?v=2" />
-
-  <!-- Librería para gráficos Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <link rel="stylesheet" href="estilos.css?v=3" />
 </head>
 <body>
 
@@ -23,18 +19,17 @@
     <header class="header">
       <div class="badge">Mercado Cambiario</div>
       <h1>Dólar en Bolivia</h1>
-      <p class="subtitle">Monitoreo del tipo de cambio oficial, tipo de cambio en bancos comerciales y mercados digitales diariamente.</p>
+      <p class="subtitle">Monitoreo del tipo de cambio oficial, bancos comerciales y mercados digitales diariamente.</p>
     </header>
 
     <!-- Pestañas de Navegación -->
     <nav class="nav-tabs">
       <button class="tab-btn active" onclick="cambiarPagina('diaria', this)">Cotizaciones del Día</button>
-      <button class="tab-btn" onclick="cambiarPagina('historico', this)">Evolución Individual</button>
-      <button class="tab-btn" onclick="cambiarPagina('comparativo', this)">Histórico Comparativo</button>
+      <button class="tab-btn" onclick="cambiarPagina('lollipop', this)">Comparativa Visual (Lollipop)</button>
       <button class="tab-btn" onclick="cambiarPagina('metodologia', this)">Metodología</button>
     </nav>
 
-    <!-- ==================== PESTAÑA 1: TABLA DIARIA + GRÁFICO ==================== -->
+    <!-- ==================== PESTAÑA 1: TABLA DIARIA ==================== -->
     <section id="pag-diaria" class="page-section active">
       <div class="table-container">
         <table>
@@ -53,71 +48,47 @@
           </tbody>
         </table>
       </div>
+    </section>
 
-      <!-- Gráfico de Cotizaciones de venta por banco -->
+    <!-- ==================== PESTAÑA 2: GRÁFICO LOLLIPOP INTERACTIVO ==================== -->
+    <section id="pag-lollipop" class="page-section">
       <div class="lollipop-card">
         <div class="lollipop-header">
           <div>
-            <h3>Cotizaciones de venta por banco</h3>
+            <h3 id="lollipop-titulo">Cotizaciones de venta por entidad</h3>
             <p class="lollipop-sub">Comparación visual ordenada de menor a mayor cotización</p>
           </div>
-          <span id="lollipop-fecha" class="lollipop-date">--</span>
+          
+          <div class="lollipop-actions">
+            <!-- Botones Compra y Venta -->
+            <div class="btn-group">
+              <button id="btn-lol-compra" onclick="setTipoOperacionLollipop('compra')">Compra</button>
+              <button id="btn-lol-venta" class="active" onclick="setTipoOperacionLollipop('venta')">Venta</button>
+            </div>
+            <span id="lollipop-fecha" class="lollipop-date">--</span>
+          </div>
         </div>
+
+        <!-- Indicador de escala / Eje -->
+        <div class="axis-header">
+          <div class="axis-title-box">
+            <span class="axis-title">Bs por 1 dólar</span>
+          </div>
+          <div class="axis-scale-track">
+            <span id="scale-min" class="axis-tick">Min</span>
+            <span id="scale-mid" class="axis-tick">Media</span>
+            <span id="scale-max" class="axis-tick">Max</span>
+          </div>
+        </div>
+
+        <!-- Filas del gráfico Lollipop -->
         <div id="lollipop-chart-container" class="lollipop-body">
           <!-- Rellenado dinámicamente por app.js -->
         </div>
       </div>
     </section>
 
-    <!-- ==================== PESTAÑA 2: GRÁFICO INDIVIDUAL ==================== -->
-    <section id="pag-historico" class="page-section">
-      <div class="chart-controls">
-        <select id="select-banco" class="select-entidad" onchange="actualizarGraficoIndividual()">
-          <!-- Opciones dinámicas -->
-        </select>
-
-        <div class="control-groups">
-          <div class="btn-group">
-            <button id="btn-ind-compra" class="active" onclick="setTipoOperacionInd('compra')">Compra</button>
-            <button id="btn-ind-venta" onclick="setTipoOperacionInd('venta')">Venta</button>
-          </div>
-
-          <div class="btn-group">
-            <button class="btn-rango-ind" onclick="setRangoInd(3, this)">3D</button>
-            <button class="btn-rango-ind" onclick="setRangoInd(7, this)">7D</button>
-            <button class="btn-rango-ind" onclick="setRangoInd(30, this)">1M</button>
-            <button class="btn-rango-ind active" onclick="setRangoInd(0, this)">Todo</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="chart-wrapper">
-        <canvas id="canvasHistorico"></canvas>
-      </div>
-    </section>
-
-    <!-- ==================== PESTAÑA 3: COMPARATIVO COMBINADO ==================== -->
-    <section id="pag-comparativo" class="page-section">
-      <div class="chart-controls">
-        <div class="btn-group">
-          <button id="btn-comp-compra" class="active" onclick="setTipoOperacionComp('compra')">Compra</button>
-          <button id="btn-comp-venta" onclick="setTipoOperacionComp('venta')">Venta</button>
-        </div>
-
-        <div class="btn-group">
-          <button class="btn-rango-comp" onclick="setRangoComp(3, this)">3D</button>
-          <button class="btn-rango-comp" onclick="setRangoComp(7, this)">7D</button>
-          <button class="btn-rango-comp" onclick="setRangoComp(30, this)">1M</button>
-          <button class="btn-rango-comp active" onclick="setRangoComp(0, this)">Todo</button>
-        </div>
-      </div>
-
-      <div class="chart-wrapper">
-        <canvas id="canvasComparativo"></canvas>
-      </div>
-    </section>
-
-    <!-- ==================== PESTAÑA 4: METODOLOGÍA ==================== -->
+    <!-- ==================== PESTAÑA 3: METODOLOGÍA ==================== -->
     <section id="pag-metodologia" class="page-section">
       <div class="methodology-card">
         <h2>Metodología de Extracción de datos</h2>
@@ -134,18 +105,14 @@
 
         <h3>2. Frecuencia y Almacenamiento</h3>
         <p>
-          Los datos se actualizan de forma programada a las 7:00 am y 12:00 pm todos los días y se registran secuencialmente en un archivo histórico para alimentar las gráficas comparativas.
+          Los datos se actualizan de forma programada a las 7:00 am y 12:00 pm todos los días y se registran secuencialmente en un archivo histórico.
         </p>
 
         <h3>3. Términos de Uso y Descargo de Responsabilidad</h3>
         <ul>
-          <li><strong>a. Finalidad Exclusivamente Informativa:</strong> Este sitio web y sus canales asociados operan únicamente como una herramienta de carácter informativo, educativo y de monitoreo estadístico. Las cotizaciones, tablas, gráficos y resúmenes presentados reflejan información de acceso público y en ningún caso constituyen asesoramiento financiero, tributario, legal ni una recomendación de inversión, compra o venta de divisas o activos digitales.</li>
-          <li><strong>b. Naturaleza de las Fuentes:</strong> Los valores recopilados provienen directamente de fuentes públicas de libre acceso, tales como los portales de entidades financieras reguladas por la Autoridad de Supervisión del Sistema Financiero (ASFI), el Banco Central de Bolivia (BCB) y el libro de órdenes entre pares (P2P USDT) de Binance.</li>
-          <li><strong>c. Naturaleza de la automatización:</strong> La información es extraída y procesada mediante algoritmos y procesos automatizados periódicos (scripts y flujos automáticos). Este observatorio no fija, altera, negocia ni interviene en la determinación de las tasas publicadas.</li>
-          <li><strong>d. Exención de Responsabilidad por Exactitud o Retrasos:</strong> Debido a la volatilidad del mercado, latencias de sincronización, modificaciones técnicas en los portales de origen o caídas temporales de servidores externos, la información mostrada puede presentar desfases, omisiones o no reflejar con total exactitud las cotizaciones en tiempo real; por tanto, los desarrolladores y colaboradores de esta plataforma no asumen responsabilidad alguna por pérdidas, daños o decisiones comerciales o financieras adoptadas con base en estos datos, siendo exclusiva obligación del usuario comprobar y validar las tasas vigentes directamente en los canales o ventanillas oficiales de cada entidad antes de ejecutar cualquier transacción.</li>
-          <li><strong>e. No Intermediación Financiera ni Custodia:</strong> Esta plataforma no realiza transacciones cambiarias, intermediación financiera, captación de fondos ni custodia de dinero o criptoactivos. Toda operación de cambio se lleva a cabo de manera independiente y exclusiva entre el usuario y las entidades financieras o plataformas correspondientes bajo sus propios términos y regulaciones.</li>
-          <li><strong>f. Propiedad Intelectual y Marcas:</strong> Los logotipos, nombres comerciales y marcas pertenecientes a las entidades bancarias, instituciones oficiales y plataformas de intercambio se utilizan únicamente con fines ilustrativos, de referencia y de atribución de autoría informativa, perteneciendo la titularidad a sus respectivos propietarios legales.</li>
-          <li><strong>g. Aceptación de los Términos:</strong> El acceso y uso de esta plataforma implica el conocimiento y la aceptación plena de este descargo de responsabilidad. Si no está de acuerdo con alguno de estos puntos, le recomendamos abstenerse de utilizar la información provista.</li>
+          <li><strong>a. Finalidad Exclusivamente Informativa:</strong> Este sitio web y sus canales asociados operan únicamente como una herramienta de carácter informativo, educativo y de monitoreo estadístico.</li>
+          <li><strong>b. Naturaleza de las Fuentes:</strong> Los valores provienen de fuentes públicas oficiales e intermediarios autorizados.</li>
+          <li><strong>c. No Intermediación Financiera:</strong> Esta plataforma no efectúa transacciones ni operaciones de compraventa de divisas.</li>
         </ul>
       </div>
     </section>
