@@ -211,6 +211,127 @@ td {
   font-variant-numeric: tabular-nums;
 }
 
+/* ==========================================
+   GRÁFICO LOLLIPOP (VENTA POR BANCO)
+   ========================================== */
+.lollipop-card {
+  margin-top: 28px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.lollipop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 14px;
+}
+
+.lollipop-header h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 3px;
+}
+
+.lollipop-sub {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.lollipop-date {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lollipop-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lollipop-row {
+  display: grid;
+  grid-template-columns: 55px 28px minmax(130px, 200px) 1fr;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.88rem;
+}
+
+.lollipop-val {
+  font-weight: 700;
+  color: var(--text-main);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.lollipop-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 1px;
+}
+
+.lollipop-fallback {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.lollipop-name {
+  color: #334155;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lollipop-track {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.lollipop-line {
+  height: 3px;
+  border-radius: 3px;
+  opacity: 0.75;
+  transition: width 0.6s ease;
+}
+
+.lollipop-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15);
+  margin-left: -5px;
+}
+
+/* ==========================================
+   CONTROLES Y GRÁFICOS CHART.JS
+   ========================================== */
 .chart-controls {
   display: flex;
   flex-wrap: wrap;
@@ -309,4 +430,15 @@ td {
   text-align: center;
   font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+/* ==========================================
+   VISTA RESPONSIVA EN MÓVILES
+   ========================================== */
+@media (max-width: 600px) {
+  .lollipop-row {
+    grid-template-columns: 45px 24px minmax(90px, 120px) 1fr;
+    gap: 8px;
+    font-size: 0.8rem;
+  }
 }
