@@ -1,8 +1,11 @@
+// ==========================================
+// 1. CONFIGURACIÓN DE ENTIDADES Y COLORES
+// ==========================================
 const entidades = [
   { id: 'oficial', nombre: 'Banco Central de Bolivia (BCB)', color: '#002B49', domain: 'https://www.bcb.gob.bo/', iniciales: 'BCB' },
   { id: 'banco_union', nombre: 'Banco Unión', color: '#003A70', domain: 'https://www.bancounion.com.bo', iniciales: 'BU' },
-  { id: 'bnb', nombre: 'Banco Nacional de Bolivia (BNB)', color: '#00853F', domain: 'https://www.bnb.com.bo/PortalBNB/Principal/BancaPersonas', iniciales: 'BNB' },
-  { id: 'bmsc', nombre: 'Banco Mercantil Santa Cruz (BMSC)', color: '#F37021', domain: 'https://www.bmsc.com.bo/', iniciales: 'BMSC' },
+  { id: 'bnb', nombre: 'BNB', color: '#00853F', domain: 'https://www.bnb.com.bo/PortalBNB/Principal/BancaPersonas', iniciales: 'BNB' },
+  { id: 'bmsc', nombre: 'Banco Mercantil Santa Cruz', color: '#F37021', domain: 'https://www.bmsc.com.bo/', iniciales: 'MSC' },
   { id: 'bisa', nombre: 'Banco BISA', color: '#FFD100', domain: 'https://www.bisa.com/home', iniciales: 'BIS' },
   { id: 'ganadero', nombre: 'Banco Ganadero', color: '#CC0000', domain: 'https://www.bg.com.bo', iniciales: 'BG' },
   { id: 'bancosol', nombre: 'Banco Sol', color: '#E4007D', domain: 'https://www.bancosol.com.bo', iniciales: 'SOL' },
@@ -11,6 +14,8 @@ const entidades = [
   { id: 'bco', nombre: 'Banco de la Comunidad', color: '#1B5E20', domain: 'https://www.bco.com.bo/', iniciales: 'BCO' },
   { id: 'bcp', nombre: 'Banco de Crédito Bolivia (BCP)', color: '#002A61', domain: 'https://www.bcp.com.bo', iniciales: 'BCP' },
   { id: 'prodem', nombre: 'Banco Prodem', color: '#007A33', domain: 'https://www.prodem.bo/Inicio', iniciales: 'PRD' },
+  { id: 'fie', nombre: 'Banco FIE', color: '#E2001A', domain: 'https://www.bancofie.com.bo/', iniciales: 'FIE' },
+  { id: 'fortaleza', nombre: 'Banco Fortaleza', color: '#004B87', domain: 'https://www.bancofortaleza.com.bo/', iniciales: 'FOR' },
   { id: 'binance', nombre: 'Binance (USDT-P2P)', color: '#F3BA2F', domain: 'https://p2p.binance.com/', iniciales: 'BIN' }
 ];
 
@@ -21,6 +26,9 @@ let rangoIndividual = 0;
 let opComparativo = 'compra';
 let rangoComparativo = 0;
 
+// ==========================================
+// 2. NAVEGACIÓN ENTRE PESTAÑAS
+// ==========================================
 function cambiarPagina(idPagina, btn) {
   document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -39,6 +47,9 @@ function cambiarPagina(idPagina, btn) {
   }
 }
 
+// ==========================================
+// 3. LECTURA Y PROCESAMIENTO DE CSV
+// ==========================================
 function formatearFechaYHora(timestampStr) {
   if (!timestampStr) return { fecha: '—', hora: '—' };
   const partes = timestampStr.trim().split(' ');
@@ -104,6 +115,9 @@ function aplicarFiltroRango(datos, rango) {
   return datos.filter(d => d.x >= limite);
 }
 
+// ==========================================
+// 4. CARGA DE TABLA DE COTIZACIONES
+// ==========================================
 async function cargarTabla() {
   const cuerpo = document.getElementById('cotizaciones-cuerpo');
   cuerpo.innerHTML = '';
@@ -138,19 +152,28 @@ async function cargarTabla() {
       const elFecha = document.getElementById(`f-${banco.id}`);
       const elHora = document.getElementById(`h-${banco.id}`);
 
-      if (banco.id === 'oficial' || banco.id === 'ganadero') {
-        elCompra.textContent = '—';
+      // Fortaleza y Fie muestran "-" en compra y venta
+      if (banco.id === 'fortaleza' || banco.id === 'fie') {
+        elCompra.textContent = '-';
+        elVenta.textContent = '-';
       } else {
-        elCompra.textContent = compra.valor !== '-' ? compra.valor : '—';
+        if (banco.id === 'oficial' || banco.id === 'ganadero') {
+          elCompra.textContent = '—';
+        } else {
+          elCompra.textContent = compra.valor !== '-' ? compra.valor : '—';
+        }
+        elVenta.textContent = venta.valor !== '-' ? venta.valor : '—';
       }
 
-      elVenta.textContent = venta.valor !== '-' ? venta.valor : '—';
       elFecha.textContent = venta.fecha !== '—' ? venta.fecha : compra.fecha;
       elHora.textContent = venta.hora !== '—' ? venta.hora : compra.hora;
     });
   }
 }
 
+// ==========================================
+// 5. GRÁFICO INDIVIDUAL
+// ==========================================
 function popularSelectBancos() {
   const select = document.getElementById('select-banco');
   select.innerHTML = '';
@@ -238,6 +261,9 @@ function setRangoInd(rango, btn) {
   actualizarGraficoIndividual();
 }
 
+// ==========================================
+// 6. GRÁFICO COMPARATIVO
+// ==========================================
 function inicializarGraficoComparativo() {
   const ctx = document.getElementById('canvasComparativo').getContext('2d');
 
@@ -305,4 +331,5 @@ function setRangoComp(rango, btn) {
   actualizarGraficoComparativo();
 }
 
+// Iniciar cargando la tabla al abrir la página
 cargarTabla();
