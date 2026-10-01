@@ -1,81 +1,96 @@
 #!/usr/bin/env python3
-"""Scraper de tipo de cambio de Banco Fortaleza con registro de fecha y hora exacta."""
+"""Scraper de tipo de cambio de Banco FIE con fecha y hora exacta de consulta."""
 
 import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
 
 DATA_DIR = Path(__file__).resolve().parent
 COMPRA_FN = DATA_DIR / "compra.csv"
 VENTA_FN = DATA_DIR / "venta.csv"
 TIMEZONE = "America/La_Paz"
 
-URL_BASE = "https://www.bancofortaleza.com.bo/"
-URL_PROXY = "https://www.bancofortaleza.com.bo/proxy-exchange.php"
+URL_BASE = "https://www.bancofie.com.bo/"
+URL_API = "https://www.bancofie.com.bo/api/tcl"
 
 
-def normalizar_decimal(texto):
-    """Extrae el valor numérico en formato decimal."""
-    limpio = re.search(r"(\d+[.,]\d+)", str(texto))
-    if not limpio:
-        raise ValueError(f"No se pudo extraer número de: {texto}")
-    return float(limpio.group(1).replace(",", "."))
+def sin_acentos(texto):
+    """Elimina tildes y normaliza a minúsculas."""
+    return "".join(
+        c
+        for c in unicodedata.normalize("NFD", str(texto))
+        if unicodedata.category(c) != "Mn"
+    ).lower()
 
 
-def consultar_fortaleza(session):
-    """Consulta las cotizaciones de Banco Fortaleza usando su endpoint directo o HTML."""
+def numero(valor):
+    """Extrae un número decimal limpio de una cadena de texto."""
+    valor = str(valor).replace("\xa0", " ").strip()
+    encontrados = re.findall(
+        r"(?<!\d)\d{1,3}(?:[.,]\d{3})*[.,]\d{1,5}(?!\d)", valor
+    )
+    if not encontrados:
+        encontrados = re.findall(r"(?<!\d)\d+(?:[.,]\d+)?(?!\d)", valor)
+    if not encontrados:
+        raise ValueError(f"No se encontró un número en: {valor!r}")
+
+    token = encontrados[-1]
+    if "," in token and "." in token:
+        decimal = "," if token.rfind(",") > token.rfind(".") else "."
+        miles = "." if decimal == "," else ","
+        token = token.replace(miles, "").replace(decimal, ".")
+    elif "," in token:
+        token = token.replace(",", ".")
+    return float(token)
+
+
+def valor_etiquetado(texto_fuente, etiqueta):
+    """Busca una etiqueta y extrae el número que le sigue."""
+    patron = rf"{etiqueta}\s*[:\-]?\s*(\d+(?:[.,]\d+)?)"
+    encontrado = re.search(patron, texto_fuente, flags=re.IGNORECASE)
+    if not encontrado:
+        raise ValueError(f"No se encontró {etiqueta!r} en el documento recibido")
+    return numero(encontrado.group(1))
+
+
+def consultar_fie(session):
+    """Consulta la API oficial de Banco FIE y extrae compra, venta y hora exacta."""
     headers = {
         "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/131.0 Safari/537.36"
         ),
-        "Accept": "*/*",
-        "Accept-Language": "es-ES,es;q=0.9",
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
         "Referer": URL_BASE,
+        "Origin": "https://www.bancofie.com.bo",
     }
 
-    compra, venta = None, None
+    # Llamada directa al endpoint JSON de Banco FIE
+    response = session.post(URL_API, json={}, headers=headers, timeout=25)
+    response.raise_for_status()
 
-    # Método 1: Endpoint JSON interno (la forma más confiable que usa la web)
-    try:
-        res_json = session.get(URL_PROXY, headers=headers, timeout=25)
-        if res_json.status_code == 200:
-            datos = res_json.json().get("response", {})
-            if "buyExchange" in datos and "saleExchange" in datos:
-                compra = float(datos["buyExchange"])
-                venta = float(datos["saleExchange"])
-    except Exception as e:
-        print(f"[DEBUG] Falló intento de JSON proxy: {e}")
+    datos = response.json()
+    documento = datos.get("resultado", {}).get("documento", "")
 
-    # Método 2: Respaldo HTML con selectores de etiquetas
-    if compra is None or venta is None:
-        res_html = session.get(URL_BASE, headers=headers, timeout=25)
-        res_html.raise_for_status()
-        soup = BeautifulSoup(res_html.text, "html.parser")
+    if not documento:
+        raise ValueError("La API de Banco FIE no devolvió el documento de cotización.")
 
-        el_compra = soup.select_one('span[data-exchange="buyExchange"]')
-        el_venta = soup.select_one('span[data-exchange="saleExchange"]')
+    doc_plano = sin_acentos(documento)
 
-        texto_compra = el_compra.get_text(strip=True) if el_compra else ""
-        texto_venta = el_venta.get_text(strip=True) if el_venta else ""
+    # Extracción de valores
+    val_compra = valor_etiquetado(doc_plano, r"dolar\s+compra")
+    val_venta = valor_etiquetado(doc_plano, r"dolar\s+venta")
 
-        if re.search(r"\d", texto_compra) and re.search(r"\d", texto_venta):
-            compra = normalizar_decimal(texto_compra)
-            venta = normalizar_decimal(texto_venta)
-
-    # Si ambos métodos fallan
-    if compra is None or venta is None:
-        raise ValueError("No se encontraron los valores de compra/venta en Banco Fortaleza.")
-
-    # Registro con fecha y hora exacta
+    # Registro de la fecha y hora exacta de consulta (Ejemplo: 2026-10-01 09:15:00)
     hora_consulta = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
-    return hora_consulta, compra, venta
+
+    return hora_consulta, val_compra, val_venta
 
 
 def consolidar(fn, timestamp, valor):
@@ -93,12 +108,12 @@ def consolidar(fn, timestamp, valor):
 
 def main():
     with requests.Session() as session:
-        hora_consulta, compra, venta = consultar_fortaleza(session)
+        hora_consulta, compra, venta = consultar_fie(session)
 
     consolidar(COMPRA_FN, hora_consulta, compra)
     consolidar(VENTA_FN, hora_consulta, venta)
     print(
-        f"Banco Fortaleza actualizado con exito para {hora_consulta}: Compra={compra}, Venta={venta}"
+        f"Banco FIE actualizado con exito para {hora_consulta}: Compra={compra}, Venta={venta}"
     )
 
 
