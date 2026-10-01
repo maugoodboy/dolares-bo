@@ -152,19 +152,14 @@ async function cargarTabla() {
       const elFecha = document.getElementById(`f-${banco.id}`);
       const elHora = document.getElementById(`h-${banco.id}`);
 
-      // Fortaleza y Fie muestran "-" en compra y venta
-      if (banco.id === 'fortaleza' || banco.id === 'fie') {
-        elCompra.textContent = '-';
-        elVenta.textContent = '-';
+      // El BCB y Ganadero no suelen tener valor de compra en este formato
+      if (banco.id === 'oficial' || banco.id === 'ganadero') {
+        elCompra.textContent = '—';
       } else {
-        if (banco.id === 'oficial' || banco.id === 'ganadero') {
-          elCompra.textContent = '—';
-        } else {
-          elCompra.textContent = compra.valor !== '-' ? compra.valor : '—';
-        }
-        elVenta.textContent = venta.valor !== '-' ? venta.valor : '—';
+        elCompra.textContent = compra.valor !== '-' ? compra.valor : '—';
       }
 
+      elVenta.textContent = venta.valor !== '-' ? venta.valor : '—';
       elFecha.textContent = venta.fecha !== '—' ? venta.fecha : compra.fecha;
       elHora.textContent = venta.hora !== '—' ? venta.hora : compra.hora;
     });
