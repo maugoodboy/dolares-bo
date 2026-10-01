@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Scraper de tipo de cambio de Banco FIE con fecha y hora exacta de consulta."""
+"""Scraper de tipo de cambio de Banco Fortaleza con registro de fecha y hora exacta."""
 
 import re
-import unicodedata
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -16,114 +15,71 @@ COMPRA_FN = DATA_DIR / "compra.csv"
 VENTA_FN = DATA_DIR / "venta.csv"
 TIMEZONE = "America/La_Paz"
 
-# URLs de consulta: página principal y página directa de tasas
-URLS_FIE = [
-    "https://www.bancofie.com.bo/",
-    "https://www.bancofie.com.bo/tasas-y-cotizaciones",
-]
-
-
-def quitar_tildes(texto):
-    """Elimina tildes y acentos para facilitar la búsqueda."""
-    texto_norm = unicodedata.normalize("NFKD", texto)
-    return "".join(c for c in texto_norm if not unicodedata.combining(c))
+URL_BASE = "https://www.bancofortaleza.com.bo/"
+URL_PROXY = "https://www.bancofortaleza.com.bo/proxy-exchange.php"
 
 
 def normalizar_decimal(texto):
-    """Convierte texto como '11,52' a número decimal float (11.52)."""
+    """Extrae el valor numérico en formato decimal."""
     limpio = re.search(r"(\d+[.,]\d+)", str(texto))
     if not limpio:
         raise ValueError(f"No se pudo extraer número de: {texto}")
     return float(limpio.group(1).replace(",", "."))
 
 
-def extraer_de_texto(texto):
-    """Busca compra y venta con patrones flexibles."""
-    texto_plano = quitar_tildes(texto).lower()
-
-    # Patrón 1: 'dolar compra: 11,52' y 'dolar venta: 12,02'
-    match_compra = re.search(r"dolar\s*compra\s*[:\-]?\s*(\d+[.,]\d+)", texto_plano)
-    match_venta = re.search(r"dolar\s*venta\s*[:\-]?\s*(\d+[.,]\d+)", texto_plano)
-
-    # Patrón 2: 'compra: 11,52' y 'venta: 12,02'
-    if not match_compra:
-        match_compra = re.search(
-            r"compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)", texto_plano
-        )
-    if not match_venta:
-        match_venta = re.search(
-            r"venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)", texto_plano
-        )
-
-    # Patrón 3: Captura directa desde la franja 'TIPOS DE CAMBIO'
-    if not match_compra or not match_venta:
-        bloque = re.search(
-            r"tipos?\s+de\s+cambio.*?dolar[^\d]+(\d+[.,]\d+)[^\d]+(\d+[.,]\d+)",
-            texto_plano,
-        )
-        if bloque:
-            val_compra = normalizar_decimal(bloque.group(1))
-            val_venta = normalizar_decimal(bloque.group(2))
-            return val_compra, val_venta
-
-    val_compra = normalizar_decimal(match_compra.group(1)) if match_compra else None
-    val_venta = normalizar_decimal(match_venta.group(1)) if match_venta else None
-    return val_compra, val_venta
-
-
-def consultar_fie(session):
-    """Prueba las fuentes disponibles y extrae compra, venta y hora de consulta."""
+def consultar_fortaleza(session):
+    """Consulta las cotizaciones de Banco Fortaleza usando su endpoint directo o HTML."""
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/124.0.0.0 Safari/537.36"
         ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept": "*/*",
         "Accept-Language": "es-ES,es;q=0.9",
-        "Referer": "https://www.google.com/",
+        "Referer": URL_BASE,
     }
 
     compra, venta = None, None
 
-    for url in URLS_FIE:
-        try:
-            response = session.get(url, headers=headers, timeout=25)
-            if response.status_code != 200:
-                continue
+    # Método 1: Endpoint JSON interno (la forma más confiable que usa la web)
+    try:
+        res_json = session.get(URL_PROXY, headers=headers, timeout=25)
+        if res_json.status_code == 200:
+            datos = res_json.json().get("response", {})
+            if "buyExchange" in datos and "saleExchange" in datos:
+                compra = float(datos["buyExchange"])
+                venta = float(datos["saleExchange"])
+    except Exception as e:
+        print(f"[DEBUG] Falló intento de JSON proxy: {e}")
 
-            response.encoding = response.apparent_encoding or "utf-8"
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            for tag in soup(["script", "style", "noscript"]):
-                tag.decompose()
-
-            texto_limpio = " ".join(soup.get_text(" ", strip=True).split())
-            compra, venta = extraer_de_texto(texto_limpio)
-
-            if compra is not None and venta is not None:
-                break
-
-            # Búsqueda en el HTML crudo si no estuvo en el texto
-            compra_html, venta_html = extraer_de_texto(response.text)
-            if compra_html and venta_html:
-                compra, venta = compra_html, venta_html
-                break
-        except Exception:
-            continue
-
+    # Método 2: Respaldo HTML con selectores de etiquetas
     if compra is None or venta is None:
-        raise ValueError(
-            "No se pudieron encontrar las cotizaciones de compra o venta en Banco FIE."
-        )
+        res_html = session.get(URL_BASE, headers=headers, timeout=25)
+        res_html.raise_for_status()
+        soup = BeautifulSoup(res_html.text, "html.parser")
 
-    # Recupera fecha y hora de la consulta (ejemplo: 2026-09-30 11:30:00)
+        el_compra = soup.select_one('span[data-exchange="buyExchange"]')
+        el_venta = soup.select_one('span[data-exchange="saleExchange"]')
+
+        texto_compra = el_compra.get_text(strip=True) if el_compra else ""
+        texto_venta = el_venta.get_text(strip=True) if el_venta else ""
+
+        if re.search(r"\d", texto_compra) and re.search(r"\d", texto_venta):
+            compra = normalizar_decimal(texto_compra)
+            venta = normalizar_decimal(texto_venta)
+
+    # Si ambos métodos fallan
+    if compra is None or venta is None:
+        raise ValueError("No se encontraron los valores de compra/venta en Banco Fortaleza.")
+
+    # Registro con fecha y hora exacta
     hora_consulta = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
     return hora_consulta, compra, venta
 
 
 def consolidar(fn, timestamp, valor):
-    """Guarda el valor en el CSV con su fecha y hora exacta."""
+    """Guarda o actualiza el archivo CSV sin duplicar registros."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     nuevo_dato = pd.DataFrame([{"timestamp": timestamp, "value": valor}])
 
@@ -137,12 +93,12 @@ def consolidar(fn, timestamp, valor):
 
 def main():
     with requests.Session() as session:
-        hora_consulta, compra, venta = consultar_fie(session)
+        hora_consulta, compra, venta = consultar_fortaleza(session)
 
     consolidar(COMPRA_FN, hora_consulta, compra)
     consolidar(VENTA_FN, hora_consulta, venta)
     print(
-        f"Banco FIE actualizado con exito para {hora_consulta}: Compra={compra}, Venta={venta}"
+        f"Banco Fortaleza actualizado con exito para {hora_consulta}: Compra={compra}, Venta={venta}"
     )
 
 
