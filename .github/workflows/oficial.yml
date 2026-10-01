@@ -33,3 +33,6 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --quiet && git diff --staged --quiet || (git commit -m "Actualizar BCB Oficial" && git pull --rebase origin main && git push)
+
+
+
