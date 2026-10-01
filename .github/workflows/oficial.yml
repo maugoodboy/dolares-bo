@@ -1,0 +1,35 @@
+name: Actualizar Oficial BCB
+
+on:
+  schedule:
+    # 7:01 AM hora de Bolivia (11:01 UTC)
+    - cron: '1 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-oficial:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar librerias necesarias
+        run: pip install requests pandas beautifulsoup4 urllib3
+
+      - name: Ejecutar scraper de BCB Oficial
+        run: python oficial/scraper.py
+
+      - name: Guardar datos Oficiales
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Actualizar BCB Oficial" && git pull --rebase origin main && git push)
