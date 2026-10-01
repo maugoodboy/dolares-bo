@@ -7,6 +7,7 @@
   --primary: #2563eb;
   --primary-light: #eff6ff;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --radius: 12px;
 }
 
@@ -62,6 +63,9 @@ h1 {
   line-height: 1.45;
 }
 
+/* ==========================================
+   NAVEGACIÓN ENTRE PESTAÑAS
+   ========================================== */
 .nav-tabs {
   display: flex;
   gap: 8px;
@@ -73,7 +77,7 @@ h1 {
 .tab-btn {
   background: transparent;
   border: 1px solid transparent;
-  padding: 8px 14px;
+  padding: 8px 16px;
   font-size: 0.88rem;
   font-weight: 500;
   color: var(--text-muted);
@@ -102,8 +106,17 @@ h1 {
 
 .page-section.active {
   display: block;
+  animation: fadeIn 0.25s ease-in-out;
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================
+   TABLA DE COTIZACIONES
+   ========================================== */
 .table-container {
   background-color: var(--surface);
   border: 1px solid var(--border);
@@ -212,24 +225,25 @@ td {
 }
 
 /* ==========================================
-   GRÁFICO LOLLIPOP (VENTA POR BANCO)
+   NUEVA PESTAÑA: GRÁFICO LOLLIPOP INTERACTIVO
    ========================================== */
 .lollipop-card {
-  margin-top: 28px;
   background-color: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 22px;
+  padding: 24px;
   box-shadow: var(--shadow-sm);
 }
 
 .lollipop-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
+  align-items: center;
+  margin-bottom: 20px;
   border-bottom: 1px solid #f1f5f9;
-  padding-bottom: 14px;
+  padding-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .lollipop-header h3 {
@@ -244,120 +258,10 @@ td {
   color: var(--text-muted);
 }
 
-.lollipop-date {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: #f1f5f9;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-variant-numeric: tabular-nums;
-}
-
-.lollipop-body {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.lollipop-row {
-  display: grid;
-  grid-template-columns: 55px 28px minmax(130px, 200px) 1fr;
-  align-items: center;
-  gap: 12px;
-  font-size: 0.88rem;
-}
-
-.lollipop-val {
-  font-weight: 700;
-  color: var(--text-main);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.lollipop-logo {
-  width: 24px;
-  height: 24px;
-  border-radius: 5px;
-  object-fit: contain;
-  border: 1px solid var(--border);
-  background: #fff;
-  padding: 1px;
-}
-
-.lollipop-fallback {
-  width: 24px;
-  height: 24px;
-  border-radius: 5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 0.65rem;
-  font-weight: 700;
-}
-
-.lollipop-name {
-  color: #334155;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.lollipop-track {
-  position: relative;
-  width: 100%;
-  height: 20px;
+.lollipop-actions {
   display: flex;
   align-items: center;
-}
-
-.lollipop-line {
-  height: 3px;
-  border-radius: 3px;
-  opacity: 0.75;
-  transition: width 0.6s ease;
-}
-
-.lollipop-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15);
-  margin-left: -5px;
-}
-
-/* ==========================================
-   CONTROLES Y GRÁFICOS CHART.JS
-   ========================================== */
-.chart-controls {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.control-groups {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.select-entidad {
-  padding: 7px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background-color: var(--surface);
-  color: var(--text-main);
-  font-size: 0.88rem;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  outline: none;
+  gap: 10px;
 }
 
 .btn-group {
@@ -370,32 +274,206 @@ td {
 .btn-group button {
   background: transparent;
   border: none;
-  padding: 5px 12px;
+  padding: 6px 14px;
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   color: var(--text-muted);
   border-radius: 6px;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .btn-group button.active {
   background: var(--surface);
-  color: var(--text-main);
-  font-weight: 600;
+  color: var(--primary);
   box-shadow: var(--shadow-sm);
 }
 
-.chart-wrapper {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: var(--shadow-sm);
-  height: 400px;
+.lollipop-date {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: #f1f5f9;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Eje / Header de escala */
+.axis-header {
+  display: grid;
+  grid-template-columns: 55px 28px minmax(130px, 190px) 1fr;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border);
+  margin-bottom: 14px;
+}
+
+.axis-title-box {
+  grid-column: 1 / 4;
+}
+
+.axis-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--primary);
+  background-color: var(--primary-light);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.axis-scale-track {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.axis-tick {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Filas del gráfico */
+.lollipop-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lollipop-row {
+  display: grid;
+  grid-template-columns: 55px 28px minmax(130px, 190px) 1fr;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.88rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background-color 0.2s ease, transform 0.15s ease;
   position: relative;
 }
 
+.lollipop-row:hover {
+  background-color: #f8fafc;
+  transform: translateX(2px);
+}
+
+.lollipop-val {
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+
+.lollipop-logo-wrap {
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.lollipop-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 2px;
+}
+
+.lollipop-fallback {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.lollipop-name {
+  color: #334155;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.lollipop-name:hover {
+  color: var(--primary);
+}
+
+/* Pista y punto Lollipop */
+.lollipop-track {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  background-color: #f1f5f9;
+  border-radius: 12px;
+  padding: 0 4px;
+}
+
+.lollipop-line {
+  height: 4px;
+  border-radius: 4px;
+  opacity: 0.85;
+  transition: width 0.4s ease;
+}
+
+.lollipop-dot {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transform: translate(-50%, 0);
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+
+.lollipop-row:hover .lollipop-dot {
+  transform: translate(-50%, 0) scale(1.4);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+}
+
+/* Tooltip al pasar el cursor sobre el punto */
+.lollipop-dot:hover::after {
+  content: attr(data-info);
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #0f172a;
+  color: #ffffff;
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: var(--shadow-md);
+}
+
+.lollipop-empty {
+  text-align: center;
+  padding: 30px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* ==========================================
+   METODOLOGÍA Y FOOTER
+   ========================================== */
 .methodology-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -435,10 +513,16 @@ td {
 /* ==========================================
    VISTA RESPONSIVA EN MÓVILES
    ========================================== */
-@media (max-width: 600px) {
+@media (max-width: 640px) {
+  .axis-header,
   .lollipop-row {
-    grid-template-columns: 45px 24px minmax(90px, 120px) 1fr;
+    grid-template-columns: 46px 24px minmax(80px, 110px) 1fr;
     gap: 8px;
     font-size: 0.8rem;
+  }
+
+  .lollipop-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
