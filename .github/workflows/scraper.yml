@@ -96,5 +96,5 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add */*.csv
-          git diff --quiet && git diff --staged --quiet || (git commit -m "[ci] actualizar todas las cotizaciones" && git pull --rebase origin main && git push)
+          git add -A
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Actualizar cotizaciones" && git pull --rebase origin main && git push)
