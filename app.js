@@ -52,11 +52,19 @@ function cambiarPagina(idPagina, btn) {
 // ==========================================
 function formatearFechaYHora(timestampStr) {
   if (!timestampStr) return { fecha: '—', hora: '—' };
-  const partes = timestampStr.trim().split(' ');
+  const str = timestampStr.trim();
+  const partes = str.split(' ');
   if (partes.length >= 2) {
     return { fecha: partes[0], hora: partes[1].substring(0, 5) };
   }
-  return { fecha: timestampStr, hora: '—' };
+  if (str.includes('T')) {
+    const subPartes = str.split('T');
+    return {
+      fecha: subPartes[0],
+      hora: (subPartes[1] || '').substring(0, 5) || '—'
+    };
+  }
+  return { fecha: str, hora: '—' };
 }
 
 async function leerUltimaFila(rutaCsv) {
@@ -96,7 +104,8 @@ async function leerTodoElCsv(rutaCsv) {
       const col = filas[i].split(',');
       if (col.length > indiceColumna) {
         const dateObj = new Date(col[0].trim().replace(' ', 'T'));
-        const valor = parseFloat(col[indiceColumna]);
+        const valorLimpio = col[indiceColumna].trim().replace(',', '.');
+        const valor = parseFloat(valorLimpio);
         if (!isNaN(dateObj) && !isNaN(valor)) {
           datos.push({ x: dateObj, y: valor });
         }
@@ -116,7 +125,7 @@ function aplicarFiltroRango(datos, rango) {
 }
 
 // ==========================================
-// 4. CARGA DE TABLA + DIBUJADO DE GRÁFICO LOLLIPOP
+// 4. CARGA DE TABLA + DIBUJADO DE GRÁFICO
 // ==========================================
 async function cargarTabla() {
   const cuerpo = document.getElementById('cotizaciones-cuerpo');
@@ -155,7 +164,6 @@ async function cargarTabla() {
     const elFecha = document.getElementById(`f-${banco.id}`);
     const elHora = document.getElementById(`h-${banco.id}`);
 
-    // El BCB y Ganadero no suelen tener valor de compra en este formato
     if (banco.id === 'oficial' || banco.id === 'ganadero') {
       elCompra.textContent = '—';
     } else {
@@ -166,9 +174,12 @@ async function cargarTabla() {
     elFecha.textContent = venta.fecha !== '—' ? venta.fecha : compra.fecha;
     elHora.textContent = venta.hora !== '—' ? venta.hora : compra.hora;
 
-    // Guardar para el gráfico si tiene un número válido de venta
-    const valorNumerico = parseFloat(venta.valor);
-    if (!isNaN(valorNumerico)) {
+    // Convertir a número asegurando comas y espacios limpios
+    const valorLimpio = String(venta.valor).trim().replace(',', '.');
+    const valorNumerico = parseFloat(valorLimpio);
+
+    // Omitimos el BCB oficial para este ranking comparativo entre entidades comerciales y digitales
+    if (!isNaN(valorNumerico) && banco.id !== 'oficial') {
       listaParaGrafico.push({
         banco,
         valor: valorNumerico,
@@ -182,7 +193,6 @@ async function cargarTabla() {
   dibujarGraficoLollipop(listaParaGrafico);
 }
 
-// Función que genera el gráfico con logos, nombres y líneas de colores
 function dibujarGraficoLollipop(items) {
   const contenedor = document.getElementById('lollipop-chart-container');
   const spanFecha = document.getElementById('lollipop-fecha');
@@ -190,18 +200,19 @@ function dibujarGraficoLollipop(items) {
 
   contenedor.innerHTML = '';
 
-  // Ordenar de menor a mayor cotización de venta
+  // Ordenar de menor a mayor cotización
   items.sort((a, b) => a.valor - b.valor);
 
-  spanFecha.textContent = items[0].fecha || '';
+  if (spanFecha) {
+    spanFecha.textContent = items[0].fecha || '';
+  }
 
   const minVal = items[0].valor;
   const maxVal = items[items.length - 1].valor;
   const margen = (maxVal - minVal) === 0 ? 1 : (maxVal - minVal);
 
   items.forEach(item => {
-    // Escalar la longitud de la línea entre 10% y 98%
-    const pct = 10 + ((item.valor - minVal) / margen) * 88;
+    const pct = 10 + ((item.valor - minVal) / margen) * 85;
 
     const row = document.createElement('div');
     row.className = 'lollipop-row';
@@ -384,5 +395,5 @@ function setRangoComp(rango, btn) {
   actualizarGraficoComparativo();
 }
 
-// Iniciar cargando la tabla y el gráfico de barras al abrir la página
+// Iniciar cargando la tabla y el gráfico
 cargarTabla();
