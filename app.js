@@ -130,7 +130,7 @@ async function cargarTabla() {
     elFecha.textContent = venta.fecha !== '—' ? venta.fecha : compra.fecha;
     elHora.textContent = venta.hora !== '—' ? venta.hora : compra.hora;
 
-    // Guardar para el gráfico Lollipop
+    // Guardar los datos para usarlos en el gráfico Lollipop
     datosCargados.push({
       banco,
       logoUrl,
@@ -161,7 +161,7 @@ function renderizarLollipop() {
 
   contenedor.innerHTML = '';
 
-  // Filtrar las entidades que tengan un valor válido para el tipo seleccionado (omitir BCB en ranking interactivo)
+  // Filtrar entidades que tengan cotización válida (excluyendo el BCB del ranking comercial)
   const items = datosCargados
     .filter(item => item.banco.id !== 'oficial' && item[tipoOperacionLollipop] !== null && !isNaN(item[tipoOperacionLollipop]))
     .map(item => ({
@@ -188,13 +188,17 @@ function renderizarLollipop() {
   const midVal = (minVal + maxVal) / 2;
   const margen = (maxVal - minVal) === 0 ? 1 : (maxVal - minVal);
 
-  // Actualizar indicadores del eje
-  document.getElementById('scale-min').textContent = `${minVal.toFixed(2)} Bs`;
-  document.getElementById('scale-mid').textContent = `${midVal.toFixed(2)} Bs`;
-  document.getElementById('scale-max').textContent = `${maxVal.toFixed(2)} Bs`;
+  // Actualizar solo las marcas numéricas de referencia (mínimo, medio, máximo)
+  const elMin = document.getElementById('scale-min');
+  const elMid = document.getElementById('scale-mid');
+  const elMax = document.getElementById('scale-max');
+
+  if (elMin) elMin.textContent = `${minVal.toFixed(2)} Bs`;
+  if (elMid) elMid.textContent = `${midVal.toFixed(2)} Bs`;
+  if (elMax) elMax.textContent = `${maxVal.toFixed(2)} Bs`;
 
   items.forEach(item => {
-    // Cálculo porcentual del punto (entre 6% y 95% para espacio visual del lollipop)
+    // Cálculo porcentual del punto (entre 6% y 95%)
     const pct = 6 + ((item.valor - minVal) / margen) * 88;
 
     const row = document.createElement('div');
@@ -220,5 +224,5 @@ function renderizarLollipop() {
   });
 }
 
-// Inicialización automática
+// Iniciar cargando la tabla de inmediato
 cargarTabla();
