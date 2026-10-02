@@ -1,20 +1,101 @@
-import os
+#!/usr/bin/env python3
+"""Scraper de tipo de cambio de Banco BCP con adaptador SSL y fecha/hora exacta."""
+
 import re
+import unicodedata
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
+
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3.util.ssl_ import create_urllib3_context
 
-def obtener_tipo_cambio_bcp():
-    url = "https://www.bcp.com.bo/"
+DATA_DIR = Path(__file__).resolve().parent
+COMPRA_FN = DATA_DIR / "compra.csv"
+VENTA_FN = DATA_DIR / "venta.csv"
+TIMEZONE = "America/La_Paz"
+URL_BCP = "https://www.bcp.com.bo/"
+
+
+class BCPAdapter(HTTPAdapter):
+    """Adaptador SSL con suites de cifrado compatibles con el servidor del BCP."""
+    def init_poolmanager(self, *args, **kwargs):
+        context = create_urllib3_context()
+        ciphers = [
+            cipher["name"]
+            for cipher in context.get_ciphers()
+            if cipher["protocol"] != "TLSv1.3"
+        ]
+        context.set_ciphers(":".join([*ciphers, "AES256-GCM-SHA384"]))
+        kwargs["ssl_context"] = context
+        return super().init_poolmanager(*args, **kwargs)
+
+
+def texto(elemento):
+    """Limpia y concatena el texto de un elemento HTML."""
+    return " ".join(elemento.get_text(" ", strip=True).split()) if elemento else ""
+
+
+def sin_acentos(valor):
+    """Elimina tildes para estandarizar búsquedas."""
+    return "".join(
+        c
+        for c in unicodedata.normalize("NFD", valor)
+        if unicodedata.category(c) != "Mn"
+    ).lower()
+
+
+def numero(valor):
+    """Extrae y normaliza el número decimal desde el texto."""
+    valor = valor.replace("\xa0", " ").strip()
+    encontrados = re.findall(r"(?<!\d)\d{1,3}(?:[.,]\d{3})*[.,]\d{1,5}(?!\d)", valor)
+    if not encontrados:
+        encontrados = re.findall(r"(?<!\d)\d+(?:[.,]\d+)?(?!\d)", valor)
+    if not encontrados:
+        raise ValueError(f"No se encontró un número en: {valor!r}")
+
+    token = encontrados[-1]
+    if "," in token and "." in token:
+        decimal = "," if token.rfind(",") > token.rfind(".") else "."
+        miles = "." if decimal == "," else ","
+        token = token.replace(miles, "").replace(decimal, ".")
+    elif "," in token:
+        token = token.replace(",", ".")
+    return float(token)
+
+
+def extraer_del_carrusel(soup):
+    """Busca las cotizaciones en los elementos del carrusel del BCP."""
+    elementos = soup.select(".marquee-content span")
+    texto_unido = " | ".join(texto(e) for e in elementos)
     
+    if not texto_unido:
+        texto_unido = texto(soup)
+
+    # Buscar patrones de Dólar Compra y Dólar Venta
+    m_compra = re.search(r"d[oó]lar\s*compra\s*[:\-]?\s*(\d+(?:[.,]\d+)?)", texto_unido, re.IGNORECASE)
+    m_venta = re.search(r"d[oó]lar\s*venta\s*[:\-]?\s*(\d+(?:[.,]\d+)?)", texto_unido, re.IGNORECASE)
+
+    if m_compra and m_venta:
+        return numero(m_compra.group(1)), numero(m_venta.group(1))
+
+    return None, None
+
+
+def consultar_bcp():
+    """Consulta la web del BCP aplicando el adaptador SSL."""
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1"
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "es-BO,es;q=0.9,en;q=0.8",
+        "Cache-Control": "no-cache",
     }
 
     # Valores de respaldo actualizados
@@ -22,52 +103,51 @@ def obtener_tipo_cambio_bcp():
     venta = 12.32
 
     session = requests.Session()
-    session.headers.update(headers)
+    session.mount(URL_BCP, BCPAdapter())
 
     try:
-        respuesta = session.get(url, timeout=20)
+        respuesta = session.get(URL_BCP, headers=headers, timeout=(10, 30))
         if respuesta.status_code == 200:
             soup = BeautifulSoup(respuesta.text, "html.parser")
-            texto_completo = soup.get_text()
-
-            # Buscar en el texto el patrón del carrusel: "Dólar Compra: XX.XX | Dólar Venta: YY.YY"
-            coincidencia = re.search(r"D[oó]lar Compra:\s*([0-9.,]+)\s*\|\s*D[oó]lar Venta:\s*([0-9.,]+)", texto_completo, re.IGNORECASE)
-
-            if coincidencia:
-                compra = float(coincidencia.group(1).replace(",", "."))
-                venta = float(coincidencia.group(2).replace(",", "."))
-                print("Se extrajeron los valores exitosamente del carrusel de la web.")
+            c, v = extraer_del_carrusel(soup)
+            if c is not None and v is not None:
+                compra, venta = c, v
+                print("Cotizaciones extraídas con éxito desde el carrusel de BCP.")
             else:
-                print("Aviso: Conectó a la web, pero no se encontró el carrusel de cotizaciones en el HTML. Se usarán valores de referencia.")
+                print("Aviso: Conectó a BCP pero no se ubicaron los elementos del carrusel. Se usan valores de referencia.")
         else:
-            print(f"Aviso: El servidor respondió con estado {respuesta.status_code}. Se usarán valores de referencia.")
-
+            print(f"Aviso: El servidor respondió con estado {respuesta.status_code}. Se usan valores de referencia.")
     except Exception as e:
-        print(f"Aviso: No se pudo conectar a la web del BCP ({e}). Se usarán valores de referencia.")
+        print(f"Aviso al consultar la web de BCP ({e}). Se usan valores de referencia.")
 
-    # 1. Obtener fecha y hora exacta con la zona horaria de Bolivia (Año-Mes-Día Horas:Minutos:Segundos)
-    timestamp_actual = datetime.now(ZoneInfo("America/La_Paz")).strftime("%Y-%m-%d %H:%M:%S")
+    hora_consulta = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
+    return hora_consulta, compra, venta
 
-    # 2. Asegurar que exista la carpeta 'bcp'
-    os.makedirs("bcp", exist_ok=True)
 
-    # 3. Guardar en compra.csv (agrega encabezado si el archivo es nuevo)
-    archivo_compra = "bcp/compra.csv"
-    es_nuevo_compra = not os.path.exists(archivo_compra) or os.path.getsize(archivo_compra) == 0
-    with open(archivo_compra, "a", encoding="utf-8") as f_compra:
-        if es_nuevo_compra:
-            f_compra.write("timestamp,value\n")
-        f_compra.write(f"{timestamp_actual},{compra}\n")
-        
-    # 4. Guardar en venta.csv (agrega encabezado si el archivo es nuevo)
-    archivo_venta = "bcp/venta.csv"
-    es_nuevo_venta = not os.path.exists(archivo_venta) or os.path.getsize(archivo_venta) == 0
-    with open(archivo_venta, "a", encoding="utf-8") as f_venta:
-        if es_nuevo_venta:
-            f_venta.write("timestamp,value\n")
-        f_venta.write(f"{timestamp_actual},{venta}\n")
+def consolidar(fn, timestamp, valor):
+    """Guarda el registro en el CSV con columnas timestamp,value y limpia valores antiguos."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    nuevo_dato = pd.DataFrame([{"timestamp": timestamp, "value": valor}])
 
-    print(f"BCP procesado con exito para {timestamp_actual}: Compra={compra}, Venta={venta}")
+    if fn.exists():
+        try:
+            df_existente = pd.read_csv(fn)
+            # Elimina registros antiguos fijados en 6.86 o 6.96
+            df_existente = df_existente[~df_existente["value"].isin([6.86, 6.96])]
+            nuevo_dato = pd.concat([df_existente, nuevo_dato])
+        except Exception:
+            pass
+
+    nuevo_dato = nuevo_dato.drop_duplicates(subset=["timestamp"], keep="last")
+    nuevo_dato.sort_values("timestamp").to_csv(fn, index=False)
+
+
+def main():
+    hora_consulta, compra, venta = consultar_bcp()
+    consolidar(COMPRA_FN, hora_consulta, compra)
+    consolidar(VENTA_FN, hora_consulta, venta)
+    print(f"BCP actualizado con éxito para {hora_consulta}: Compra={compra}, Venta={venta}")
+
 
 if __name__ == "__main__":
-    obtener_tipo_cambio_bcp()
+    main()
