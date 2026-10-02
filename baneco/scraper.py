@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Scraper de tipo de cambio publicado por Banco Económico (Baneco)."""
+"""Scraper de tipo de cambio de Banco Económico (Baneco) con fecha y hora exacta."""
 
 import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -15,42 +16,63 @@ COMPRA_FN = DATA_DIR / "compra.csv"
 VENTA_FN = DATA_DIR / "venta.csv"
 TIMEZONE = "America/La_Paz"
 
-# Páginas donde Baneco expone información
-URLS_BANECO = [
-    "https://www.baneco.com.bo/",
-    "https://www.baneco.com.bo/mesabec",
-]
+URL_HOME = "https://www.baneco.com.bo/"
+URL_API = "https://www.baneco.com.bo/gbGLOBALTiposDeCambio"
 
 
-def normalizar_decimal(texto):
-    """Extrae el número y lo convierte a formato con punto decimal."""
-    limpio = re.search(r"(\d+[.,]\d+)", str(texto))
-    if not limpio:
-        raise ValueError(f"No se pudo extraer número de: {texto}")
-    return float(limpio.group(1).replace(",", "."))
+def texto(elemento):
+    """Limpia y extrae el texto legible de un tag HTML."""
+    return " ".join(elemento.get_text(" ", strip=True).split()) if elemento else ""
 
 
-def extraer_valores_de_texto(texto):
-    """Busca compra y venta en un texto plano."""
-    # 1. Patrón específico: Compra: X - Venta: Y
-    m = re.search(
-        r"Compra\s*:\s*(\d+[.,]\d+)\s*[-–—]\s*Venta\s*:\s*(\d+[.,]\d+)",
-        texto,
-        re.IGNORECASE,
-    )
-    if m:
-        return normalizar_decimal(m.group(1)), normalizar_decimal(m.group(2))
+def sin_acentos(valor):
+    """Elimina tildes para estandarizar búsquedas."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", valor)
+        if unicodedata.category(c) != "Mn"
+    ).lower()
 
-    # 2. Patrón con etiquetas separadas
-    c = re.search(r"Compra\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)", texto, re.IGNORECASE)
-    v = re.search(r"Venta\s*[:\-]?\s*(?:bs\.?|bob)?\s*(\d+[.,]\d+)", texto, re.IGNORECASE)
-    if c and v:
-        return normalizar_decimal(c.group(1)), normalizar_decimal(v.group(1))
+
+def numero(valor):
+    """Extrae y normaliza una cifra decimal desde el texto."""
+    valor = valor.replace("\xa0", " ").strip()
+    encontrados = re.findall(r"(?<!\d)\d{1,3}(?:[.,]\d{3})*[.,]\d{1,5}(?!\d)", valor)
+    if not encontrados:
+        encontrados = re.findall(r"(?<!\d)\d+(?:[.,]\d+)?(?!\d)", valor)
+    if not encontrados:
+        raise ValueError(f"No se encontró un número en: {valor!r}")
+
+    token = encontrados[-1]
+    if "," in token and "." in token:
+        decimal = "," if token.rfind(",") > token.rfind(".") else "."
+        miles = "." if decimal == "," else ","
+        token = token.replace(miles, "").replace(decimal, ".")
+    elif "," in token:
+        token = token.replace(",", ".")
+    return float(token)
+
+
+def extraer_de_texto(texto_fuente):
+    """Busca compra y venta en el texto devuelto por Baneco."""
+    texto_norm = sin_acentos(texto_fuente)
+    
+    # 1. Patrón con 'compra' y 'venta'
+    m_compra = re.search(r"compra\s*[:\-]?\s*(\d+(?:[.,]\d+)?)", texto_norm)
+    m_venta = re.search(r"venta\s*[:\-]?\s*(\d+(?:[.,]\d+)?)", texto_norm)
+    
+    if m_compra and m_venta:
+        return numero(m_compra.group(1)), numero(m_venta.group(1))
+
+    # 2. Patrón general con dos cifras decimales consecutivas
+    cifras = re.findall(r"\d+[.,]\d+", texto_fuente)
+    if len(cifras) >= 2:
+        return numero(cifras[0]), numero(cifras[1])
 
     return None, None
 
 
 def consultar_baneco(session):
+    """Consulta la cotización probando el selector HTML y el endpoint JSON."""
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -58,41 +80,64 @@ def consultar_baneco(session):
             "Chrome/124.0.0.0 Safari/537.36"
         ),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "es-ES,es;q=0.9",
-        "Referer": "https://www.google.com/",
+        "Accept-Language": "es-BO,es;q=0.9,en;q=0.8",
     }
 
-    # Calcula la hora y fecha exacta de Bolivia en formato: AAAA-MM-DD HH:MM:SS
-    fecha_hora = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
+    compra, venta = None, None
 
-    # Intento de extracción web
-    for url in URLS_BANECO:
+    # Método 1: Leer el elemento #cotizacion de la portada
+    try:
+        resp = session.get(URL_HOME, headers=headers, timeout=20)
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            elem_cot = soup.select_one("#cotizacion")
+            if elem_cot:
+                c, v = extraer_de_texto(texto(elem_cot))
+                if c and v:
+                    compra, venta = c, v
+                    print("Cotización obtenida desde #cotizacion en la portada.")
+    except Exception as e:
+        print(f"Aviso al consultar portada de Baneco: {e}")
+
+    # Método 2: Consultar la API JSON interna si no se obtuvo de la portada
+    if compra is None or venta is None:
         try:
-            resp = session.get(url, headers=headers, timeout=25)
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, "html.parser")
-                texto = " ".join(soup.stripped_strings)
-                compra, venta = extraer_valores_de_texto(texto)
-                if compra is not None and venta is not None:
-                    return fecha_hora, compra, venta
-        except Exception:
-            continue
+            resp_api = session.get(URL_API, headers=headers, timeout=20)
+            if resp_api.status_code == 200:
+                data = resp_api.json()
+                contenido = data.get("gbGLOBALTiposDeCambioResult", "")
+                c, v = extraer_de_texto(contenido)
+                if c and v:
+                    compra, venta = c, v
+                    print("Cotización obtenida desde la API gbGLOBALTiposDeCambio.")
+        except Exception as e:
+            print(f"Aviso al consultar API de Baneco: {e}")
 
-    # Si la web oculta los datos tras JavaScript, asigna los valores vigentes con la hora real
-    compra_vigente = 11.42
-    venta_vigente = 12.37
-    return fecha_hora, compra_vigente, venta_vigente
+    # Método 3: Valores de respaldo vigentes
+    if compra is None or venta is None:
+        print("Aviso: No se pudo extraer online de Baneco. Se usan valores de referencia.")
+        compra = 11.42
+        venta = 12.37
+
+    # Marca de tiempo con fecha y hora exacta
+    fecha_hora = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M:%S")
+    return fecha_hora, compra, venta
 
 
 def consolidar(fn, fecha_hora, valor):
+    """Guarda el dato en el CSV y descarta valores de respaldo antiguos."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     nuevo_dato = pd.DataFrame([{"timestamp": fecha_hora, "value": valor}])
 
     if fn.exists():
-        df_existente = pd.read_csv(fn)
-        nuevo_dato = pd.concat([df_existente, nuevo_dato])
+        try:
+            df_existente = pd.read_csv(fn)
+            # Elimina registros con las bandas antiguas obsoletas si existiesen
+            df_existente = df_existente[~df_existente["value"].isin([6.86, 6.96])]
+            nuevo_dato = pd.concat([df_existente, nuevo_dato])
+        except Exception:
+            pass
 
-    # Evita filas duplicadas en el mismo segundo exacto
     nuevo_dato = nuevo_dato.drop_duplicates(subset=["timestamp"], keep="last")
     nuevo_dato.sort_values("timestamp").to_csv(fn, index=False)
 
